@@ -4,6 +4,8 @@
 //! prints one `ERROR:` line per diagnostic and exits 1 on any, 0 otherwise.
 //! `silica-idlc rust <out-dir> <file.idl>...` also writes one Rust module per
 //! protocol to `<out-dir>/<a>_<b>_<name>.rs` (`spec/IDL.md` section 6).
+//! `silica-idlc docs <out-dir> <file.idl>...` writes one reference page per
+//! protocol to `<out-dir>/<full.Name>.md`, generated from the same source.
 //! `silica-idlc check-compat <old.idl> <new.idl>` checks that the new version
 //! of a protocol only adds to the old one (`spec/IDL.md` section 4); one
 //! `ERROR:` line per violation and exit 1 on any, 0 otherwise.
@@ -56,6 +58,22 @@ fn main() -> ExitCode {
             let paths: Vec<PathBuf> = args[2..].iter().map(PathBuf::from).collect();
             rust(Path::new(&args[1]), &paths)
         }
+        Some("docs") if args.len() > 2 => {
+            let paths: Vec<PathBuf> = args[2..].iter().map(PathBuf::from).collect();
+            let ps = match idlc::load(&paths) {
+                Ok(ps) => ps,
+                Err(errs) => return report(errs),
+            };
+            for p in &ps {
+                let file = Path::new(&args[1]).join(format!("{}.md", p.name));
+                if let Err(e) = std::fs::write(&file, idlc::docgen::markdown(p)) {
+                    eprintln!("ERROR: {}: cannot write: {e}", file.display());
+                    return ExitCode::from(1);
+                }
+            }
+            println!("silica-idlc: {} page(s) written", ps.len());
+            ExitCode::SUCCESS
+        }
         Some("check-compat") if args.len() == 3 => {
             match idlc::check_compat_files(Path::new(&args[1]), Path::new(&args[2])) {
                 Ok(()) => {
@@ -67,7 +85,7 @@ fn main() -> ExitCode {
         }
         _ => {
             eprintln!(
-                "ERROR: usage: silica-idlc check <file.idl>... | silica-idlc rust <out-dir> <file.idl>... | silica-idlc check-compat <old.idl> <new.idl>"
+                "ERROR: usage: silica-idlc check <file.idl>... | silica-idlc rust <out-dir> <file.idl>... | silica-idlc docs <out-dir> <file.idl>... | silica-idlc check-compat <old.idl> <new.idl>"
             );
             ExitCode::from(2)
         }

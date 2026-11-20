@@ -241,7 +241,7 @@ pub enum ObjType {
     Endpoint,
     Notification,
     SchedContext,
-    IoPort,
+    Hw,
     Vcpu,
 }
 
@@ -255,7 +255,7 @@ impl ObjType {
         ObjType::Endpoint,
         ObjType::Notification,
         ObjType::SchedContext,
-        ObjType::IoPort,
+        ObjType::Hw,
         ObjType::Vcpu,
     ];
 
@@ -269,7 +269,7 @@ impl ObjType {
             ObjType::Endpoint => "Endpoint",
             ObjType::Notification => "Notification",
             ObjType::SchedContext => "SchedContext",
-            ObjType::IoPort => "IoPort",
+            ObjType::Hw => "Hw",
             ObjType::Vcpu => "Vcpu",
         }
     }

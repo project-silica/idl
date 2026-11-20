@@ -11,6 +11,7 @@
 pub mod ast;
 pub mod check;
 pub mod compat;
+pub mod docgen;
 pub mod parse;
 pub mod rustgen;
 
