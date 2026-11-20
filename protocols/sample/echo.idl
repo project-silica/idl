@@ -43,7 +43,8 @@ protocol sample.Echo version 1 {
     /// Returns `data` unchanged.
     echo @1 (data: bytes) -> (data: bytes);
 
-    /// Returns `records` unchanged. Fails with `empty` when no record is given.
+    /// Returns `records` unchanged. Fails with `empty` when no record is given and with
+    /// `too_many` when the provider accepts fewer (each provider documents its limit).
     echo_records @2 (records: array<Record>) -> (records: array<Record>) error EchoError;
 
     /// Returns the given capabilities unchanged and in the same order.

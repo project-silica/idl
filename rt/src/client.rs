@@ -57,8 +57,9 @@ pub enum CallError<E> {
     Transport(TransportError),
 }
 
-/// Moves one request to a provider and its reply back. libsys implements it
-/// over the kernel's call/reply IPC; host tests over a direct call of a
+/// Moves one request to a provider and its reply back. On Silica the
+/// runtime's `silica_rt::ipc::Channel` implements it over the kernel's
+/// call/reply IPC; host tests implement it with a direct call of a
 /// generated `dispatch`.
 pub trait Transport<C> {
     /// Sends `request` with the capabilities `caps`, waits for the reply,

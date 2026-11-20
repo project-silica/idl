@@ -73,10 +73,31 @@ fn interface(o: &mut String, p: &Protocol) {
     let mut out = String::new();
     let mut block = false; // inside a struct, enum or the Server trait
     let mut client = false; // inside `impl ... Client<T, C>`
+    let mut dispatch = false; // inside the signature of `dispatch`
+    let mut derive = ""; // the derive attribute before the next item
     for line in code.lines() {
         let t = line.trim_start();
         let indent = line.len() - t.len();
-        if block {
+        if dispatch {
+            out.push_str(line.get(4..).unwrap_or(""));
+            if t.starts_with(')') {
+                dispatch = false;
+                out.truncate(out.trim_end_matches(" {").len());
+                out.push_str(";\n\n");
+            } else {
+                out.push('\n');
+            }
+        } else if indent == 4 && t.starts_with("#[derive(") {
+            derive = t;
+        } else if indent == 4 && t.starts_with("pub fn dispatch<") {
+            dispatch = true;
+            out.push_str(t);
+            out.push('\n');
+        } else if indent == 4
+            && t.starts_with("impl<T, C> ::core::convert::From<T> for Client<T, C>")
+        {
+            out.push_str("impl<T, C> From<T> for Client<T, C>;  // `Client::from(transport)`\n\n");
+        } else if block {
             out.push_str(line.get(4..).unwrap_or(""));
             out.push('\n');
             if indent == 4 && t == "}" {
@@ -89,6 +110,11 @@ fn interface(o: &mut String, p: &Protocol) {
                 || t.starts_with("pub trait Server"))
         {
             block = !t.ends_with(';') && !t.ends_with('}');
+            if !derive.is_empty() {
+                out.push_str(derive);
+                out.push('\n');
+                derive = "";
+            }
             out.push_str(t);
             out.push('\n');
             if !block {
@@ -114,7 +140,8 @@ fn interface(o: &mut String, p: &Protocol) {
         "The items of `{}` a program names, exactly as generated (`bytes` is `&[u8]`, `string` is `&str`, \
          `array<T>` is `silica_idl_rt::Array`, built with `Array::new(&[..])` and read with `.len()` and \
          `.iter()`; a capability is a `C`; an enum has one more variant, `Unknown(raw)`, for values of a \
-         newer peer):\n\n```rust\n{}```\n",
+         newer peer; every struct and enum also implements `Clone`, `Debug` and `PartialEq`, and has no \
+         fields but the ones shown):\n\n```rust\n{}```\n",
         module_name(p),
         out
     );

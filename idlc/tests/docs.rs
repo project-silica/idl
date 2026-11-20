@@ -33,6 +33,10 @@ fn every_method_type_and_failure_is_on_the_page() {
         "| `echo` | `client.echo(data)` | `EchoReply` | `Infallible` |",
         "echo::dispatch(&mut server,",
         "pub struct EchoReply<'a> {",
+        "#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]\npub enum EchoError {",
+        "impl<T, C> From<T> for Client<T, C>;",
+        "pub fn dispatch<C: ::silica_idl_rt::Capability, S: Server<C> + ?Sized>(\n    server: &mut S,",
+        ") -> usize;",
         "pub trait Server<C: ::silica_idl_rt::Capability> {",
         "fn echo_caps<'a>(&'a mut self, frame: C, peer: ::core::option::Option<C>, any: C) -> EchoCapsReply<C>;",
         "pub fn echo<'s>(&'s mut self, data: &'_ [u8])",
@@ -46,8 +50,6 @@ fn every_method_type_and_failure_is_on_the_page() {
 #[test]
 fn the_documentation_of_the_source_is_carried_over_verbatim() {
     let page = page();
-    assert!(
-        page.contains("Returns `records` unchanged. Fails with `empty` when no record is given.")
-    );
+    assert!(page.contains("Fails with `empty` when no record is given and with"));
     assert!(page.contains("A record with one field of every non-capability type."));
 }
