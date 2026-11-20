@@ -33,8 +33,9 @@ use core::cell::Cell;
 
 /// Header length in bytes.
 pub const HEADER_LEN: usize = 16;
-/// Largest message, header included.
-pub const MAX_MESSAGE: usize = 4096;
+/// Largest message, header included: what one kernel message carries
+/// (500 words; `kernel/abi`). Anything larger travels in a shared Frame.
+pub const MAX_MESSAGE: usize = 4000;
 /// Most capabilities one message carries.
 pub const MAX_CAPS: usize = 4;
 /// Deepest nesting of field lists (the payload's own list is depth 1).
