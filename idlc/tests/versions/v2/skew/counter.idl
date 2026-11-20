@@ -1,0 +1,63 @@
+// Version 2 of the version-skew fixture (A06.03, idlc/tests/versioning.rs):
+// version 1 plus an appended parameter, result and struct field of each
+// defaultable kind, new enum variants, a new struct and a new method.
+
+/// A counter used only to test version skew.
+///
+/// Revocation of the caller's endpoint capability mid-call ends the call with
+/// `revoked`; a provider restart ends it with `peer_gone`; cancellation ends it
+/// with `cancelled`. In each case there is no reply data.
+protocol skew.Counter version 2 {
+    /// Direction of counting.
+    enum Mode : u8 {
+        up = 0,
+        down = 1,
+        /// Added in version 2.
+        hold = 2,
+    }
+
+    /// Why a step was refused.
+    enum Fault : u16 {
+        overflow = 1,
+        /// Added in version 2.
+        frozen = 2,
+    }
+
+    /// Added in version 2.
+    struct Window {
+        lo: u64,
+        hi: u64,
+    }
+
+    /// One step of the counter.
+    struct Step {
+        by: u32,
+        /// Added in version 2.
+        label: string,
+        /// Added in version 2.
+        mode: Mode,
+    }
+
+    /// Applies `step` `repeat` times (0 means once) and returns the new total.
+    add @1 (
+        step: Step,
+        repeat: u32,
+        window: option<Window>,
+        strict: bool,
+    ) -> (
+        total: u64,
+        history: array<u64>,
+        note: string,
+    ) error Fault;
+
+    /// Current mode and total.
+    status @2 () -> (mode: Mode, total: u64, window: Window);
+
+    /// Hands over a frame; returns it unchanged.
+    swap @3 (frame: cap<Frame>, offset: u64) -> (frame: cap<Frame>, length: u64);
+
+    reserved @4;
+
+    /// Added in version 2: sets the total.
+    reset @5 (to: u64) -> ();
+}

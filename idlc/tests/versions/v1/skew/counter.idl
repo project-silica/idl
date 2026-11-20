@@ -1,0 +1,38 @@
+// Version 1 of the version-skew fixture (A06.03, idlc/tests/versioning.rs).
+// Version 2 in ../../v2/skew/counter.idl adds to it in every way spec/IDL.md
+// section 4 allows; the test runs each version's client against the other's
+// server.
+
+/// A counter used only to test version skew.
+///
+/// Revocation of the caller's endpoint capability mid-call ends the call with
+/// `revoked`; a provider restart ends it with `peer_gone`; cancellation ends it
+/// with `cancelled`. In each case there is no reply data.
+protocol skew.Counter version 1 {
+    /// Direction of counting.
+    enum Mode : u8 {
+        up = 0,
+        down = 1,
+    }
+
+    /// Why a step was refused.
+    enum Fault : u16 {
+        overflow = 1,
+    }
+
+    /// One step of the counter.
+    struct Step {
+        by: u32,
+    }
+
+    /// Applies `step` and returns the new total.
+    add @1 (step: Step) -> (total: u64) error Fault;
+
+    /// Current mode and total.
+    status @2 () -> (mode: Mode, total: u64);
+
+    /// Hands over a frame; returns it unchanged.
+    swap @3 (frame: cap<Frame>) -> (frame: cap<Frame>);
+
+    reserved @4;
+}

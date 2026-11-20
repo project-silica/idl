@@ -1,0 +1,62 @@
+// Sample protocol for the M0 exit test (spec/MILESTONES.md, M0): the IDL compiler
+// parses it and round-trips every message. It uses every construct of spec/IDL.md.
+
+/// A request/reply protocol used only to test the compiler.
+///
+/// Revocation of the caller's endpoint capability mid-call ends the call with
+/// `revoked`; a provider restart ends it with `peer_gone`; cancellation ends it
+/// with `cancelled`. In each case there is no reply data, and every method is
+/// safe to retry.
+protocol sample.Echo version 1 {
+    /// Why a request was refused.
+    enum EchoError : u32 {
+        /// No record was given.
+        empty = 1,
+        /// More records were given than the provider accepts.
+        too_many = 2,
+    }
+
+    /// Kind of a record.
+    enum Kind : u8 {
+        plain = 0,
+        tagged = 1,
+    }
+
+    /// A record with one field of every non-capability type.
+    struct Record {
+        kind: Kind,
+        flag: bool,
+        a: u8,
+        b: u16,
+        c: u32,
+        d: u64,
+        e: i8,
+        f: i16,
+        g: i32,
+        h: i64,
+        name: string,
+        blob: bytes,
+        tags: array<string>,
+        parent: option<u64>,
+    }
+
+    /// Returns `data` unchanged.
+    echo @1 (data: bytes) -> (data: bytes);
+
+    /// Returns `records` unchanged. Fails with `empty` when no record is given.
+    echo_records @2 (records: array<Record>) -> (records: array<Record>) error EchoError;
+
+    /// Returns the given capabilities unchanged and in the same order.
+    echo_caps @3 (
+        frame: cap<Frame>,
+        peer: option<endpoint<sample.Echo>>,
+        any: cap,
+    ) -> (
+        frame: cap<Frame>,
+        peer: option<endpoint<sample.Echo>>,
+        any: cap,
+    );
+
+    /// Retired ordinal, kept so the grammar's `reserved` form is exercised.
+    reserved @4;
+}

@@ -1,0 +1,21 @@
+[package]
+name = "silica-idlc"
+description = "The Silica IDL compiler: .idl -> Rust client/server stubs (A06)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "idlc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "silica-idlc"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+silica-idl-rt = { path = "../rt" }

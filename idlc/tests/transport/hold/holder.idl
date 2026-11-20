@@ -1,0 +1,15 @@
+// Fixture of the A06.04 transport tests (idlc/tests/transport.rs): one method
+// that carries both bytes and a capability, so a request and a reply can
+// exceed the limits while holding a capability.
+
+/// Holds a frame next to some data, used only to test the transport.
+///
+/// Revocation of the caller's endpoint capability mid-call ends the call with
+/// `revoked`; a provider restart ends it with `peer_gone`; cancellation ends it
+/// with `cancelled`. In each case there is no reply data, and the method is
+/// safe to retry.
+protocol hold.Holder version 1 {
+    /// Takes `frame` and `data`; returns a frame and data of the provider's
+    /// choice.
+    put @1 (data: bytes, frame: cap<Frame>) -> (data: bytes, frame: cap<Frame>);
+}
