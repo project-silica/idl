@@ -32,6 +32,10 @@ fn every_method_type_and_failure_is_on_the_page() {
         "| `echo_records` | `client.echo_records(records)` | `EchoRecordsReply` | `EchoError` |",
         "| `echo` | `client.echo(data)` | `EchoReply` | `Infallible` |",
         "echo::dispatch(&mut server,",
+        "pub struct EchoReply<'a> {",
+        "pub trait Server<C: ::silica_idl_rt::Capability> {",
+        "fn echo_caps<'a>(&'a mut self, frame: C, peer: ::core::option::Option<C>, any: C) -> EchoCapsReply<C>;",
+        "pub fn echo<'s>(&'s mut self, data: &'_ [u8])",
         "`CallError::Error(e)` is the method's own error",
         "the request's capability list by value",
     ] {

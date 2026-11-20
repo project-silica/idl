@@ -63,6 +63,63 @@ fn fields(o: &mut String, heading: &str, fs: &[Field]) {
     o.push('\n');
 }
 
+/// The exact Rust items of the generated module that a user names: every
+/// struct and enum, the client's methods and the provider's trait, taken
+/// from the generated code itself so the page cannot drift from it.
+fn interface(o: &mut String, p: &Protocol) {
+    let Ok(code) = super::rustgen::rust(p) else {
+        return;
+    };
+    let mut out = String::new();
+    let mut block = false; // inside a struct, enum or the Server trait
+    let mut client = false; // inside `impl ... Client<T, C>`
+    for line in code.lines() {
+        let t = line.trim_start();
+        let indent = line.len() - t.len();
+        if block {
+            out.push_str(line.get(4..).unwrap_or(""));
+            out.push('\n');
+            if indent == 4 && t == "}" {
+                block = false;
+                out.push('\n');
+            }
+        } else if indent == 4
+            && (t.starts_with("pub struct ")
+                || t.starts_with("pub enum ")
+                || t.starts_with("pub trait Server"))
+        {
+            block = !t.ends_with(';') && !t.ends_with('}');
+            out.push_str(t);
+            out.push('\n');
+            if !block {
+                out.push('\n');
+            }
+        } else if indent == 4
+            && t.starts_with("impl")
+            && t.contains("Transport<C>")
+            && t.contains(" Client<T, C>")
+        {
+            client = true;
+            out.push_str("// Methods of Client<T, C>, for T: Transport<C>:\n");
+        } else if client && indent == 4 && t == "}" {
+            client = false;
+            out.push('\n');
+        } else if client && indent == 8 && t.starts_with("pub fn ") {
+            out.push_str(t.trim_end_matches('{').trim_end());
+            out.push_str(";\n");
+        }
+    }
+    let _ = writeln!(
+        o,
+        "The items of `{}` a program names, exactly as generated (`bytes` is `&[u8]`, `string` is `&str`, \
+         `array<T>` is `silica_idl_rt::Array`, built with `Array::new(&[..])` and read with `.len()` and \
+         `.iter()`; a capability is a `C`; an enum has one more variant, `Unknown(raw)`, for values of a \
+         newer peer):\n\n```rust\n{}```\n",
+        module_name(p),
+        out
+    );
+}
+
 /// The Markdown reference page of protocol `p`.
 pub fn markdown(p: &Protocol) -> String {
     let mut o = String::new();
@@ -165,6 +222,7 @@ pub fn markdown(p: &Protocol) -> String {
          `CallError::Transport(t)` one of the common failures. A reply borrows the client until it is dropped: \
          strings, bytes and arrays in it are views of the client's reply buffer.\n"
     );
+    interface(&mut o, p);
     let _ = writeln!(
         o,
         "| Method | Client call | Reply type | Error type |\n| --- | --- | --- | --- |"
