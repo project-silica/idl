@@ -161,7 +161,7 @@ pub fn markdown(p: &Protocol) -> String {
          **Calling.** `{module}::Client::from(transport)` wraps anything that implements `silica_idl_rt::Transport<C>`; \
          there is one method per protocol method, taking the parameters in order and returning \
          `Result<{module}::<Method>Reply, silica_idl_rt::CallError<E>>` where `E` is the method's error enum \
-         (`core::convert::Infallible` when it has none). `CallError::Method(e)` is the method's own error; \
+         (`core::convert::Infallible` when it has none). `CallError::Error(e)` is the method's own error; \
          `CallError::Transport(t)` one of the common failures. A reply borrows the client until it is dropped: \
          strings, bytes and arrays in it are views of the client's reply buffer.\n"
     );
@@ -192,11 +192,14 @@ pub fn markdown(p: &Protocol) -> String {
     }
     let _ = writeln!(
         o,
-        "\n**Providing.** Implement `{module}::Server<C>`: one method per protocol method, receiving the decoded \
-         `<Method>Request` and returning `Result<<Method>Reply, E>`. For each request received, call \
-         `{module}::dispatch(&mut server, request_bytes, request_caps, &mut reply_buffer, &mut reply_caps)`; it decodes, \
-         calls the method, encodes the reply (or the error, or `unknown_method`/`malformed_request`) and returns the \
-         reply's length. The transport's server loop on Silica does this for you; see the runtime's documentation.\n"
+        "\n**Providing.** Implement `{module}::Server<C>`: one method per protocol method, taking the parameters in \
+         order (capabilities by value: they are the provider's now) and returning the method's `<Method>Reply`, or \
+         `Result<<Method>Reply, E>` when the method declares an error. For each request received, call \
+         `{module}::dispatch(&mut server, request_bytes, request_caps, &mut reply_buffer, &mut reply_caps)`, which takes \
+         the request's capability list by value, decodes, calls the method, encodes the reply (or the error, or \
+         `unknown_method`, `malformed_request`, `reply_too_large`) and returns the reply's length; it cannot fail. \
+         The runtime's server loop on Silica (`silica_rt::ipc::serve`) receives, calls a closure with exactly these \
+         arguments, and sends the reply.\n"
     );
     o
 }

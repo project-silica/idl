@@ -32,6 +32,8 @@ fn every_method_type_and_failure_is_on_the_page() {
         "| `echo_records` | `client.echo_records(records)` | `EchoRecordsReply` | `EchoError` |",
         "| `echo` | `client.echo(data)` | `EchoReply` | `Infallible` |",
         "echo::dispatch(&mut server,",
+        "`CallError::Error(e)` is the method's own error",
+        "the request's capability list by value",
     ] {
         assert!(page.contains(want), "the page lacks: {want}\n{page}");
     }
