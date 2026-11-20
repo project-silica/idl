@@ -344,7 +344,7 @@ impl<'a, 'c, C> Decoder<'a, 'c, C> {
     /// This decoder without capabilities: a capability index read through
     /// it is [`DecodeError::BadCapIndex`]. Array elements are decoded through
     /// one, because they carry no capabilities
-    /// (`spec/adr/0010-capabilities-in-the-rust-mapping.md`).
+    /// (`spec/IDL_RATIONALE.md` section 6).
     pub(crate) fn bytes_only(&self) -> Decoder<'a, 'a, C> {
         Decoder {
             buf: self.buf,

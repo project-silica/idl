@@ -1,4 +1,4 @@
-// Version 1 of the version-skew fixture (A06.03, idlc/tests/versioning.rs).
+// Version 1 of the version-skew fixture (idlc/tests/versioning.rs).
 // Version 2 in ../../v2/skew/counter.idl adds to it in every way spec/IDL.md
 // section 4 allows; the test runs each version's client against the other's
 // server.

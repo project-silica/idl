@@ -1,4 +1,4 @@
-// Version 2 of the version-skew fixture (A06.03, idlc/tests/versioning.rs):
+// Version 2 of the version-skew fixture (idlc/tests/versioning.rs):
 // version 1 plus an appended parameter, result and struct field of each
 // defaultable kind, new enum variants, a new struct and a new method.
 

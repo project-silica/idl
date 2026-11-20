@@ -6,10 +6,10 @@
 //! The generated code depends only on `silica_idl_rt` and `core`, and the
 //! output is a deterministic function of the protocol.
 //!
-//! Capabilities move (`spec/adr/0009-idl-transport-before-libsys.md`):
+//! Capabilities move (`spec/IDL_RATIONALE.md` section 5):
 //! encoding takes values by value, decoding takes the capability list by
 //! value, and an `array` element type may not carry a capability
-//! (`spec/adr/0010-capabilities-in-the-rust-mapping.md`).
+//! (`spec/IDL_RATIONALE.md` section 6).
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -197,7 +197,7 @@ fn carries_cap(p: &Protocol, ty: &Type) -> bool {
 /// Rejects every `array<T>` whose `T` can carry a capability: capabilities
 /// move, and an array is a borrowed slice when sent and a view of the bytes
 /// when received, so neither can own one
-/// (`spec/adr/0010-capabilities-in-the-rust-mapping.md`).
+/// (`spec/IDL_RATIONALE.md` section 6).
 fn check_arrays(p: &Protocol) -> Vec<Diagnostic> {
     fn walk(p: &Protocol, ty: &Type, errs: &mut Vec<Diagnostic>) {
         match &ty.kind {

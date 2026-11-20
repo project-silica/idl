@@ -1,5 +1,5 @@
 //! Evolution check between two versions of one protocol (`spec/IDL.md`
-//! section 4, `spec/REPOSITORIES.md` section 2 rule 3): a new version may only
+//! section 4): a new version may only
 //! add. `silica-idlc check-compat <old> <new>` runs [`check_compat`].
 //!
 //! Rules, each a diagnostic with file, line and column:
@@ -308,7 +308,7 @@ fn enumeration(cx: &mut Cx<'_>, o: &Enum, n: &Enum) {
 /// Whether a value of type `ty` can reference a capability (`cap`, `cap<T>`,
 /// `endpoint<P>`), at any depth. An older decoder skips an unknown field's
 /// bytes but not the capabilities they index, so such a field cannot be
-/// appended (`spec/adr/0005-evolution-check-rules.md`).
+/// appended (`spec/IDL_RATIONALE.md` section 3).
 fn carries_cap(p: &Protocol, ty: &Type, depth: u32) -> bool {
     if depth > 64 {
         return true;

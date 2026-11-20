@@ -1,4 +1,4 @@
-// Fixture of the A06.04 transport tests (idlc/tests/transport.rs): one method
+// Fixture of the transport tests (idlc/tests/transport.rs): one method
 // that carries both bytes and a capability, so a request and a reply can
 // exceed the limits while holding a capability.
 

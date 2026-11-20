@@ -1,5 +1,5 @@
 //! The Silica IDL compiler (component A06): parser and semantic checks of the
-//! grammar fixed by `spec/IDL.md` (ADR 0002), and the Rust generator of
+//! grammar fixed by `spec/IDL.md`, and the Rust generator of
 //! section 6 (runtime: `silica-idl-rt`), and the evolution check of
 //! section 4 ([`compat::check_compat`]).
 //!

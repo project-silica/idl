@@ -1,5 +1,5 @@
-//! A06.03: `silica-idlc check-compat` accepts exactly the additive changes of
-//! `spec/IDL.md` section 4 (as refined by `spec/adr/0005-evolution-check-rules.md`)
+//! `silica-idlc check-compat` accepts exactly the additive changes of
+//! `spec/IDL.md` section 4 (as refined by `spec/IDL_RATIONALE.md` section 3)
 //! and rejects every other change with file, line and column; generated
 //! clients and servers of two versions of one protocol interoperate in both
 //! directions.

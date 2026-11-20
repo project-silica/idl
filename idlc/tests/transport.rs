@@ -1,4 +1,4 @@
-//! A06.04: the transport decisions of `spec/adr/0009-idl-transport-before-libsys.md`
+//! The transport design of `spec/IDL_RATIONALE.md` section 5
 //! (`spec/IDL.md` sections 3 and 5). Capabilities carry an object type that
 //! decoding checks; they are not `Clone` and move into a call; a reply that
 //! exceeds the limits becomes status 4 `reply_too_large`.

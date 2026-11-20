@@ -1,4 +1,4 @@
-//! A06.01: the parser accepts the sample protocol and rejects every violation
+//! The parser accepts the sample protocol and rejects every violation
 //! of the rules of `spec/IDL.md` sections 1 and 2 with file, line and column.
 
 use std::path::{Path, PathBuf};

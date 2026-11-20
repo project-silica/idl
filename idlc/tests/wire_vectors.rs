@@ -1,5 +1,5 @@
-//! A06.02: the known-answer vectors of `spec/IDL.md` section 3.1
-//! (`spec/adr/0008-wire-known-answer-vectors.md`). Each value encodes to
+//! The known-answer vectors of `spec/IDL.md` section 3.1
+//! (`spec/IDL_RATIONALE.md` section 4). Each value encodes to
 //! exactly the vector's bytes, and each vector decodes to exactly the value.
 //! The bytes below are copied from the spec text; never regenerate them from
 //! the encoder. Where this file and the code disagree, the code is wrong.

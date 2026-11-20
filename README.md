@@ -2,7 +2,7 @@
 
 Every Silica interface definition (`.idl`), the IDL compiler (`silica-idlc`)
 and the generated-binding conformance tests. This is the stable contract of the
-platform: protocols evolve additively (`spec/REPOSITORIES.md` section 2).
+platform: protocols evolve additively (`spec/ARCHITECTURE.md` section 4).
 
 Belongs here: protocol definitions, the compiler, its runtime support crate and
 conformance tests. Does not belong here: protocol implementations (providers

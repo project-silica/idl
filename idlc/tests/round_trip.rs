@@ -1,4 +1,4 @@
-//! A06.02 and the M0 exit test (`spec/MILESTONES.md`): every message of the
+//! The M0 exit test (`spec/MILESTONES.md`): every message of the
 //! sample protocol round-trips through the generated encode and decode with
 //! equal values, also through the generated client, `dispatch` and server;
 //! malformed input (`spec/IDL.md` section 3) is rejected, never a panic.

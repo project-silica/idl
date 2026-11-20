@@ -8,7 +8,7 @@
 //! [`Capability`]); they travel in a [`CapList`] next to the bytes, never as
 //! bytes. They move: encoding a value moves its capabilities into the list,
 //! decoding moves them out of it, and nothing clones them
-//! (`spec/adr/0009-idl-transport-before-libsys.md`). Host tests use plain
+//! (`spec/IDL_RATIONALE.md` section 5). Host tests use plain
 //! stand-in values.
 //!
 //! Decoding is total and allocates nothing: strings, bytes and arrays decode

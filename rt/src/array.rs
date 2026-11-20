@@ -9,7 +9,7 @@ use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder};
 /// view that decodes its elements again when iterated (they were validated
 /// when the array was decoded). Two arrays are equal when their elements are.
 /// Elements carry no capabilities: generated Rust rejects an `array` whose
-/// element type can carry one (`spec/adr/0010-capabilities-in-the-rust-mapping.md`).
+/// element type can carry one (`spec/IDL_RATIONALE.md` section 6).
 pub struct Array<'a, T, C> {
     repr: Repr<'a, T, C>,
 }
