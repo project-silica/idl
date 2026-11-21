@@ -1,0 +1,30 @@
+[package]
+name = "silica-idl-rt-fuzz"
+description = "Coverage-guided fuzz targets for the IDL wire format (run by tools/fuzz.sh)."
+version = "0.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+silica-idl-rt = { path = ".." }
+
+[build-dependencies]
+silica-idlc = { path = "../../idlc" }
+
+[[bin]]
+name = "messages"
+path = "fuzz_targets/messages.rs"
+test = false
+doc = false
+bench = false
+
+# Not part of the idl workspace: cargo-fuzz builds it on its own.
+[workspace]
+
+[profile.release]
+debug = 1

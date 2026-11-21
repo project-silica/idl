@@ -624,3 +624,35 @@ fn generator_rejects_reserved_names() {
     assert!(text.iter().any(|t| t.contains("`Unknown`")), "{text:?}");
     assert!(text.iter().any(|t| t.contains("`PingReply`")), "{text:?}");
 }
+
+/// A request too short to carry an ordinal, or carrying 0, is still answered,
+/// with `malformed_request` and ordinal 0 (`spec/IDL.md` section 4): a reply
+/// the caller can decode. Ordinal 0 is valid in no other message.
+#[test]
+fn answers_a_request_without_an_ordinal() {
+    let mut server = EchoServer;
+    let mut reply = [0u8; silica_idl_rt::MAX_MESSAGE];
+    for req in [&[][..], &[1, 0][..], &[0u8; 16][..]] {
+        let mut rcl = CapList::new();
+        let n = echo::dispatch(
+            &mut server,
+            req,
+            CapList::<Cap>::new(),
+            &mut reply,
+            &mut rcl,
+        );
+        let h = silica_idl_rt::Header::decode(&reply[..n]).expect("the reply decodes");
+        assert_eq!(
+            (h.ordinal, h.reply, h.status),
+            (0, true, Status::MalformedRequest),
+            "request {req:?}"
+        );
+    }
+    // Ordinal 0 with any other status, or in a request, is malformed.
+    let mut m = reply;
+    m[6] = Status::UnknownMethod as u8;
+    assert!(silica_idl_rt::Header::decode(&m[..16]).is_err());
+    let mut q = [0u8; 16];
+    q[6] = Status::MalformedRequest as u8;
+    assert!(silica_idl_rt::Header::decode(&q).is_err());
+}

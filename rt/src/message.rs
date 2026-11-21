@@ -73,12 +73,16 @@ impl Header {
         let status = le16(msg, 6);
         let version = le32(msg, 8);
         let payload_len = le32(msg, 12);
-        if ordinal == 0 || flags & !FLAG_REPLY != 0 {
+        if flags & !FLAG_REPLY != 0 {
             return Err(DecodeError::BadHeader);
         }
         let reply = flags & FLAG_REPLY != 0;
         let status = Status::from_raw(status).ok_or(DecodeError::BadHeader)?;
         if !reply && status != Status::Ok {
+            return Err(DecodeError::BadHeader);
+        }
+        // Ordinal 0 appears only in the answer to a request that carried none.
+        if ordinal == 0 && !(reply && status == Status::MalformedRequest) {
             return Err(DecodeError::BadHeader);
         }
         if payload_len as usize != msg.len() - HEADER_LEN {
