@@ -38,6 +38,8 @@ protocol silica.block.Device version 1 {
         /// The blocks asked for are not all within what this capability
         /// reaches.
         outside = 6,
+        /// No traced request of this client's has that tag.
+        no_such_request = 7,
     }
 
     /// What a block device is.
@@ -83,4 +85,11 @@ protocol silica.block.Device version 1 {
     /// result on; the provider enforces the range on every request made
     /// through it, and `info` through it says `blocks` blocks.
     narrow @5 (first: u64, blocks: u64) -> (device: cap<Endpoint>) error Error;
+
+    /// Where a traced request went in the provider (a request whose tag
+    /// has bit 62 set is traced; the 16 most recent are kept): when it was
+    /// taken from the ring, when the device accepted it, and when it was
+    /// completed (monotonic nanoseconds, the clock every program reads; 0:
+    /// not yet). Only the client that made the request may ask.
+    trace @6 (tag: u64) -> (taken: u64, started: u64, done: u64) error Error;
 }
