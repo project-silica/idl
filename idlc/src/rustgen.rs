@@ -782,11 +782,19 @@ impl Gen<'_> {
                 None => format!("{rep}{}", rn.args("'a")),
             };
             docs(&mut o, "        ", &m.docs);
+            // The lifetime is named only where a parameter or the reply
+            // borrows from the request: what the reference page shows is
+            // what an implementer writes, and nothing in it is needless.
+            let params = self.params(&m.params, "'a");
+            let (decl, this) = if params.contains("'a") || ret.contains("'a") {
+                ("<'a>", "&'a mut self")
+            } else {
+                ("", "&mut self")
+            };
             let _ = writeln!(
                 o,
-                "        fn {}<'a>(&'a mut self{}) -> {ret};",
-                m.name.name,
-                self.params(&m.params, "'a")
+                "        fn {}{decl}({this}{params}) -> {ret};",
+                m.name.name
             );
         }
         let _ = writeln!(o, "    }}");

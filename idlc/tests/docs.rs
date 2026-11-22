@@ -38,7 +38,7 @@ fn every_method_type_and_failure_is_on_the_page() {
         "pub fn dispatch<C: ::silica_idl_rt::Capability, S: Server<C> + ?Sized>(\n    server: &mut S,",
         ") -> usize;",
         "pub trait Server<C: ::silica_idl_rt::Capability> {",
-        "fn echo_caps<'a>(&'a mut self, frame: C, peer: ::core::option::Option<C>, any: C) -> EchoCapsReply<C>;",
+        "fn echo_caps(&mut self, frame: C, peer: ::core::option::Option<C>, any: C) -> EchoCapsReply<C>;",
         "pub fn echo<'s>(&'s mut self, data: &'_ [u8])",
         "`CallError::Error(e)` is the method's own error",
         "the request's capability list by value",
