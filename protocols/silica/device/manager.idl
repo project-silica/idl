@@ -34,6 +34,15 @@ protocol silica.device.Manager version 1 {
 
     /// An endpoint to the driver of the device `id`, speaking the protocol
     /// of the device's class. It stops working when the driver ends; a
-    /// driver that is started again is reached by a new `open`.
-    open @2 (id: u32) -> (driver: cap<Endpoint>) error Error;
+    /// driver that is started again is reached by a new `open`. `gone`, if
+    /// given, is signalled when this driver ends (however it ends), so a
+    /// client waiting for its device hears of it at once: the device
+    /// manager keeps the capability until then.
+    open @2 (id: u32, gone: option<cap<Notification>>) -> (driver: cap<Endpoint>) error Error;
+
+    /// End the driver of the device `id` at once, as if it had failed, and
+    /// start it again: what the owner does to a driver that misbehaves, and
+    /// how its clients' recovery is tested. Its clients' `gone` is
+    /// signalled.
+    restart @3 (id: u32) -> () error Error;
 }

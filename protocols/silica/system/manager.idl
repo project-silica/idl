@@ -1,0 +1,53 @@
+// The service manager's protocol (components D02, D16): what the owner, the
+// power button and a remote management session use to look at and steer
+// the system.
+
+/// The system's services, and the machine's power.
+///
+/// Provided by the service manager (the root task). Every running program
+/// of the system is one of its services or a child of one; a service is
+/// named as its declaration names it (the boot archive's services list).
+protocol silica.system.Manager version 1 {
+    /// Why a call was refused.
+    enum Error : u32 {
+        /// No service has that name.
+        no_such_service = 1,
+        /// The service cannot do that: it is not running (`stop`), or it
+        /// is one the system cannot run without (`stop`, `restart` of the
+        /// device manager).
+        refused = 2,
+    }
+
+    /// What a service is doing.
+    enum State : u32 {
+        /// It runs.
+        running = 1,
+        /// It is not running: it ended, was stopped, or only runs as a check.
+        stopped = 2,
+        /// It failed more often than it is started again.
+        failed = 3,
+    }
+
+    /// A service.
+    struct Service {
+        name: string,
+        state: State,
+        /// How many times it failed since the system started.
+        failures: u32,
+        /// The protocol it provides, or the empty string.
+        provides: string,
+    }
+
+    /// Every declared service and what it is doing.
+    list @1 () -> (services: array<Service>);
+
+    /// Stop the service `name` now (its program ends at once, as if it had
+    /// failed, but it is not started again) or start it again.
+    stop @2 (name: string) -> () error Error;
+    start @3 (name: string) -> () error Error;
+
+    /// Stop every service, in the reverse of the order they started, then
+    /// turn the machine off (`reboot`: reset it). Answered only if it
+    /// cannot be done.
+    shutdown @4 (reboot: bool) -> () error Error;
+}
