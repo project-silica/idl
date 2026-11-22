@@ -1,0 +1,39 @@
+// The device manager's protocol (component D15): how a program that uses
+// devices (the block server, the network stack) finds the drivers.
+
+/// The devices of the machine that have a running driver, and the way to
+/// reach each driver.
+///
+/// A device is named by its identity: PCI segment, bus, device and function
+/// as `segment << 16 | bus << 8 | device << 3 | function`.
+protocol silica.device.Manager version 1 {
+    /// Why a call was refused.
+    enum Error : u32 {
+        /// No device with that identity has a running driver.
+        no_such_device = 1,
+    }
+
+    /// What a device is for.
+    enum Class : u32 {
+        /// Storage addressed in blocks; its driver speaks `silica.block.Device`.
+        block = 1,
+    }
+
+    /// A device with a running driver.
+    struct Device {
+        /// Its identity.
+        id: u32,
+        /// What it is for, and so which protocol its driver speaks.
+        class: Class,
+        /// The name of its driver.
+        driver: string,
+    }
+
+    /// The devices of class `class` that have a running driver.
+    list @1 (class: Class) -> (devices: array<Device>);
+
+    /// An endpoint to the driver of the device `id`, speaking the protocol
+    /// of the device's class. It stops working when the driver ends; a
+    /// driver that is started again is reached by a new `open`.
+    open @2 (id: u32) -> (driver: cap<Endpoint>) error Error;
+}

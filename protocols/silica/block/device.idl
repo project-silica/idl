@@ -1,0 +1,75 @@
+// The block device class protocol (spec/ARCHITECTURE.md section 7): what
+// every block driver provides, and what the block server provides again for
+// each partition, so a filesystem cannot tell the two apart.
+
+/// A block device: storage addressed in fixed-size blocks.
+///
+/// The calls here are the control path: what the device is, and setting up
+/// the data path. Requests themselves do not travel as calls. They go
+/// through a pair of rings in a frame the client shares (`connect`), and
+/// their data lies in frames the client registers (`add_memory`) and the
+/// device reads and writes in place: nothing is copied between the client
+/// and the device. The layout of the rings and of the records in them is
+/// part of this protocol; it is written out in the `silica_block` crate's
+/// documentation, which also has a client.
+///
+/// One client is connected at a time. Everything the client shares stays
+/// the client's: it takes the rings and the memory back by revoking them
+/// (or by ending), at which point the device can no longer reach them and
+/// the provider treats the connection as closed. A provider that ends is
+/// seen by its client as `peer_gone` on the next call here; requests it had
+/// not completed are to be sent again to the provider that replaces it
+/// (reads and writes of blocks may be repeated).
+protocol silica.block.Device version 1 {
+    /// Why a call was refused.
+    enum Error : u32 {
+        /// Another client is connected, or this one already is.
+        busy = 1,
+        /// `connect` has not been called.
+        not_connected = 2,
+        /// The capability is not a frame of a usable size, or the number
+        /// is already in use (`add_memory`) or names nothing (`remove_memory`).
+        bad_memory = 3,
+        /// The provider has no room for more: memory or table space.
+        no_room = 4,
+        /// Requests that use the memory are still in progress.
+        in_use = 5,
+    }
+
+    /// What a block device is.
+    struct Info {
+        /// Bytes in a block: a power of two, at least 512.
+        block_size: u32,
+        /// Number of blocks.
+        blocks: u64,
+        /// Writes are refused.
+        read_only: bool,
+        /// The device has a volatile write cache: written data is durable
+        /// only after a flush request completes. Without one every
+        /// completed write is durable.
+        write_cache: bool,
+        /// Most blocks one request may cover.
+        max_blocks: u32,
+    }
+
+    /// Describes the device. May be called at any time.
+    info @1 () -> (info: Info);
+
+    /// Sets up the data path. `rings` is one frame of 16 KiB holding the
+    /// request ring and the completion ring; `completions` is signalled by
+    /// the provider when it has added completions and the client said it
+    /// was going to sleep. The result is the notification the client
+    /// signals when it has added requests and the provider said it was
+    /// going to sleep.
+    connect @2 (rings: cap<Frame>, completions: cap<Notification>) -> (requests: cap<Notification>) error Error;
+
+    /// Registers a frame of the client's as memory requests may use, under
+    /// the number `id` (below 64). Requests name their data as a number, an
+    /// offset and a length. The device is given the frame for reading, and
+    /// with `writable` for writing too (needed for read requests).
+    add_memory @3 (id: u32, frame: cap<Frame>, writable: bool) -> () error Error;
+
+    /// Withdraws a registration. The device can no longer reach the frame
+    /// when the call returns.
+    remove_memory @4 (id: u32) -> () error Error;
+}
