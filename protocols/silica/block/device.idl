@@ -13,8 +13,9 @@
 /// part of this protocol; it is written out in the `silica_block` crate's
 /// documentation, which also has a client.
 ///
-/// One client is connected at a time. Everything the client shares stays
-/// the client's: it takes the rings and the memory back by revoking them
+/// Each capability to the device is one client, connected once; several
+/// clients may be connected at a time (a disk's partitions, each through a
+/// capability `narrow` made). Everything a client shares stays the client's: it takes the rings and the memory back by revoking them
 /// (or by ending), at which point the device can no longer reach them and
 /// the provider treats the connection as closed. A provider that ends is
 /// seen by its client as `peer_gone` on the next call here; requests it had
@@ -34,6 +35,9 @@ protocol silica.block.Device version 1 {
         no_room = 4,
         /// Requests that use the memory are still in progress.
         in_use = 5,
+        /// The blocks asked for are not all within what this capability
+        /// reaches.
+        outside = 6,
     }
 
     /// What a block device is.
@@ -72,4 +76,11 @@ protocol silica.block.Device version 1 {
     /// Withdraws a registration. The device can no longer reach the frame
     /// when the call returns.
     remove_memory @4 (id: u32) -> () error Error;
+
+    /// A capability to the same device that reaches only `blocks` blocks
+    /// from block `first` of what this one reaches, numbered from 0 there:
+    /// a partition. Whoever holds a capability may narrow it and hand the
+    /// result on; the provider enforces the range on every request made
+    /// through it, and `info` through it says `blocks` blocks.
+    narrow @5 (first: u64, blocks: u64) -> (device: cap<Endpoint>) error Error;
 }

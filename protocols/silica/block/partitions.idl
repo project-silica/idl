@@ -1,0 +1,44 @@
+// The partitions of the machine's disks (the block server, component F01):
+// what a filesystem opens instead of a whole disk.
+
+/// The partitions of every disk, as their GPT describes them.
+///
+/// A partition is opened as a disk is through the device manager: `open`
+/// returns a capability to the disk's driver that reaches only the
+/// partition's blocks, numbered from 0 (`silica.block.Device`'s `narrow`),
+/// and signals `gone` when that driver ends; the client then opens the
+/// partition again, from the driver started in its place. Requests go to
+/// the driver directly: this service is on the way to a partition, not on
+/// the way of its requests.
+protocol silica.block.Partitions version 1 {
+    /// Why a call was refused.
+    enum Error : u32 {
+        /// No partition has that identity.
+        no_such_partition = 1,
+        /// Its disk has no driver now (it may be on its way).
+        gone = 2,
+    }
+
+    /// A partition.
+    struct Partition {
+        /// What `open` takes: the disk's identity times 256 plus the
+        /// partition's number in the disk's table.
+        id: u32,
+        /// The disk's identity (as the device manager names it).
+        disk: u32,
+        /// Its first block on the disk, and how many blocks.
+        first: u64,
+        blocks: u64,
+        /// Its type (the GPT's type GUID, in the usual text form).
+        kind: string,
+        /// Its name, as the table gives it.
+        name: string,
+    }
+
+    /// Every partition of every disk.
+    list @1 () -> (partitions: array<Partition>);
+
+    /// The partition `id`: a capability to its disk's driver that reaches
+    /// it alone; `gone` is signalled when that driver ends.
+    open @2 (id: u32, gone: option<cap<Notification>>) -> (device: cap<Endpoint>) error Error;
+}
