@@ -3,7 +3,7 @@
 //! section 6 (runtime: `silica-idl-rt`), and the evolution check of
 //! section 4 ([`compat::check_compat`]).
 //!
-//! Entry points: [`parse`] for one file's text, [`compile`] for a set of
+//! Entry points: [`parse()`] for one file's text, [`compile`] for a set of
 //! files compiled together, [`load`] to read and compile files from disk,
 //! [`rustgen::rust`] for the Rust module of one compiled protocol,
 //! [`check_compat_files`] to compare two versions of one protocol.
@@ -123,7 +123,7 @@ pub fn load(paths: &[PathBuf]) -> Result<Vec<Protocol>, Vec<Diagnostic>> {
     }
 }
 
-/// Read two versions of one protocol, check each on its own ([`parse`]) and
+/// Read two versions of one protocol, check each on its own ([`parse()`]) and
 /// then that `new` only adds to `old` ([`compat::check_compat`],
 /// `spec/IDL.md` section 4). Rules that need other files (`endpoint<P>`
 /// resolution) are left to [`load`].

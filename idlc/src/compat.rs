@@ -49,7 +49,7 @@ impl Cx<'_> {
 }
 
 /// Every way `new` is not an additive evolution of `old`. Both must already
-/// pass [`super::parse`]. Empty means compatible. Sorted by file and position.
+/// pass [`super::parse()`]. Empty means compatible. Sorted by file and position.
 pub fn check_compat(old: &Protocol, new: &Protocol) -> Vec<Diagnostic> {
     let mut cx = Cx {
         old,
