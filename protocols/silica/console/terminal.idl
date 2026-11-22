@@ -1,0 +1,19 @@
+// The local console: text out to the screen (and the serial line), lines in
+// from the keyboard.
+
+/// A text terminal: what a shell talks to.
+///
+/// Output is UTF-8 text; a line ends with `\n`. The console keeps what does
+/// not fit by scrolling. Input is read a line at a time, edited on the
+/// console (backspace works) and echoed there, so a program sees only
+/// complete lines.
+protocol silica.console.Terminal version 1 {
+    /// Show `text`.
+    write @1 (text: string) -> ();
+
+    /// The next line typed, without its end. Waits until one is complete.
+    read_line @2 () -> (line: string);
+
+    /// The size of the screen, in characters.
+    size @3 () -> (columns: u32, rows: u32);
+}

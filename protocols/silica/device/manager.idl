@@ -17,6 +17,10 @@ protocol silica.device.Manager version 1 {
     enum Class : u32 {
         /// Storage addressed in blocks; its driver speaks `silica.block.Device`.
         block = 1,
+        /// A display; its driver speaks `silica.display.Framebuffer`.
+        display = 2,
+        /// A keyboard (later pointers); its driver speaks `silica.input.Device`.
+        input = 3,
     }
 
     /// A device with a running driver.

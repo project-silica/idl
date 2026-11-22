@@ -1,0 +1,62 @@
+// The display device class protocol, as every display driver provides it.
+
+/// A display: a screen of pixels in one mode, and a way to put pixels on it.
+///
+/// The pixels live in the client's memory, not the driver's: the client
+/// lends a frame (`attach`), draws in it, and says which rectangle changed
+/// (`present`); the driver reads that rectangle and puts it on the screen.
+/// A driver that ends takes nothing of the client's with it, and one that
+/// scans out from memory directly needs no copy at all. The driver only
+/// reads the frame.
+///
+/// One client draws at a time: `attach` replaces the frame of the last
+/// `attach`, whoever made it. A client that hears its driver ended (the
+/// device manager's death notice) opens the new one, attaches again and
+/// presents the whole screen.
+protocol silica.display.Device version 1 {
+    /// How pixels are laid out.
+    enum Format : u32 {
+        /// Four bytes a pixel, in memory order red, green, blue, unused.
+        rgbx = 1,
+        /// Four bytes a pixel, in memory order blue, green, red, unused.
+        bgrx = 2,
+    }
+
+    /// The mode: the screen's size and its pixels' format.
+    struct Mode {
+        width: u32,
+        height: u32,
+        format: Format,
+    }
+
+    /// A rectangle of the screen, in pixels from its top left corner.
+    struct Rect {
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+    }
+
+    /// Why a call was refused.
+    enum Error : u32 {
+        /// The frame is not one the driver can read.
+        bad_memory = 1,
+        /// No frame is attached (or another client's replaced it).
+        not_attached = 2,
+        /// The rectangle is not on the screen, or its pixels are not all
+        /// in the frame.
+        outside = 3,
+    }
+
+    /// The mode the display is in. It does not change while the driver runs.
+    mode @1 () -> (mode: Mode);
+
+    /// Show pixels from `pixels`, a frame of the caller's, from now on.
+    attach @2 (pixels: cap<Frame>) -> () error Error;
+
+    /// Put `rect` on the screen. Its pixels are read from the attached
+    /// frame, in the mode's format: its top left pixel at byte `offset`,
+    /// each row `stride` pixels after the one before. Returns when they
+    /// have been read: the client may draw over them.
+    present @3 (rect: Rect, offset: u64, stride: u32) -> () error Error;
+}

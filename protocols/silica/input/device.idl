@@ -1,0 +1,35 @@
+// The input device class protocol: keyboards (and later pointers), as
+// every input driver provides it.
+
+/// An input device: a keyboard.
+///
+/// Events travel through a ring in a frame the client shares (`connect`),
+/// not as calls: the driver adds a record per key pressed or released and
+/// signals the client's notification when the client said it sleeps (the
+/// `silica_ring` rule). A record is 8 bytes: the key as a USB HID keyboard
+/// usage (u16, page 7: 0x04 is A, 0x28 Enter, 0xE0 to 0xE7 the modifiers),
+/// whether it went down (u8: 1) or up (0), then five bytes of zeros. The
+/// ring holds 256 records; when the client does not keep up, the newest
+/// keys are dropped. Layouts (which character a key makes) are the client's
+/// business, not the driver's.
+///
+/// One client is connected at a time; a new `connect` replaces the old one.
+protocol silica.input.Device version 1 {
+    /// Why a call was refused.
+    enum Error : u32 {
+        /// The frame is not a frame of 4 KiB the driver may write.
+        bad_memory = 1,
+    }
+
+    /// What kind of device it is.
+    enum Kind : u32 {
+        keyboard = 1,
+    }
+
+    /// What the device is.
+    describe @1 () -> (kind: Kind, name: string);
+
+    /// Start sending events: `ring` is a frame of 4 KiB for the ring,
+    /// `events` is signalled when records were added and the client sleeps.
+    connect @2 (ring: cap<Frame>, events: cap<Notification>) -> () error Error;
+}
