@@ -16,6 +16,10 @@ protocol silica.system.Manager version 1 {
         /// is one the system cannot run without (`stop`, `restart` of the
         /// device manager).
         refused = 2,
+        /// The caller already gave a log of that name (`add_log`).
+        exists = 3,
+        /// There is no log ring at that place (`log_ring`).
+        no_such_log = 4,
     }
 
     /// What a service is doing.
@@ -59,4 +63,23 @@ protocol silica.system.Manager version 1 {
     /// turn the machine off (`reboot`: reset it). Answered only if it
     /// cannot be done.
     shutdown @4 (reboot: bool) -> () error Error;
+
+    /// Give a program the calling service runs itself (a driver the device
+    /// manager starts) a log of its own, kept and read like a service's:
+    /// `ring` is a frame of 2^14 bytes the caller made (`silica_rt::log`
+    /// lays it out), and `wake` what its writer signals, the two a
+    /// program is started with (`silica_proc::Program::log`). The log
+    /// shows its text as the source `<caller>/<name>`, where `<caller>` is
+    /// the calling service's name, so no service can write as another. The
+    /// caller keeps both for the next program in the same place (a driver
+    /// started again writes on where the last one stopped). At most 64
+    /// logs are given in all; past that, and with no log service, the
+    /// answer is `refused`.
+    add_log @6 (name: string, ring: cap<Frame>) -> (wake: cap<Notification>) error Error;
+
+    /// For the log service alone (`refused` to any other caller): the
+    /// `index`th log given with `add_log` (0 first), its source's name and
+    /// its ring; `no_such_log` past the last. The log service is told that
+    /// there are new ones by its notification.
+    log_ring @7 (index: u32) -> (name: string, ring: cap<Frame>) error Error;
 }
