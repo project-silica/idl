@@ -1,0 +1,67 @@
+// The network interface class protocol (spec/ARCHITECTURE.md section 7):
+// what every network driver provides to the network stack.
+
+/// A network interface: Ethernet frames out and in.
+///
+/// As with `silica.block.Device`, the calls are the control path. Frames do
+/// not travel as calls: they go through a pair of rings in a frame the
+/// client shares (`connect`), and lie in frames the client registers
+/// (`add_memory`) and the device reads and writes in place. To send, the
+/// client puts a frame in its memory and a transmit request in the ring; to
+/// receive, it offers buffers ahead of time with receive requests, and each
+/// completes when a frame has arrived in it, with the frame's length. The
+/// layout of the rings and the records is written out in the `silica_net`
+/// crate's documentation, which also has a client.
+///
+/// A frame is an Ethernet frame from its destination address to the end of
+/// its payload, without the frame check sequence: the device adds that and
+/// strips it.
+///
+/// One client is connected at a time. Everything it shares stays its own:
+/// it takes the rings and the memory back by revoking them (or by ending).
+/// A provider that ends is seen as `peer_gone` on the next call; receive
+/// buffers it had not filled are offered again to the provider that
+/// replaces it, and transmit requests it had not completed may be sent
+/// again (a frame may then go out twice, which networks allow).
+protocol silica.net.Device version 1 {
+    /// Why a call was refused.
+    enum Error : u32 {
+        /// Another client is connected, or this one already is.
+        busy = 1,
+        /// `connect` has not been called.
+        not_connected = 2,
+        /// The capability is not a frame of a usable size, or the number
+        /// is already in use (`add_memory`) or names nothing (`remove_memory`).
+        bad_memory = 3,
+        /// The provider has no room for more: memory or table space.
+        no_room = 4,
+        /// Requests that use the memory are still in progress.
+        in_use = 5,
+    }
+
+    /// What an interface is.
+    struct Info {
+        /// Its Ethernet address, in the low six bytes, first byte lowest.
+        address: u64,
+        /// The largest payload a frame carries (1500 on most links); a
+        /// frame is at most 14 bytes longer.
+        mtu: u32,
+        /// Whether the link is up now (see the ring's link records).
+        link_up: bool,
+    }
+
+    /// Describes the interface. May be called at any time.
+    info @1 () -> (info: Info);
+
+    /// Sets up the data path, as `silica.block.Device`'s `connect`.
+    connect @2 (rings: cap<Frame>, completions: cap<Notification>) -> (requests: cap<Notification>) error Error;
+
+    /// Registers a frame of the client's as memory requests may use, under
+    /// the number `id` (below 64). The device is given it for reading, and
+    /// with `writable` for writing too (needed for receive buffers).
+    add_memory @3 (id: u32, frame: cap<Frame>, writable: bool) -> () error Error;
+
+    /// Withdraws a registration. The device can no longer reach the frame
+    /// when the call returns.
+    remove_memory @4 (id: u32) -> () error Error;
+}
