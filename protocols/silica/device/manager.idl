@@ -51,4 +51,12 @@ protocol silica.device.Manager version 1 {
     /// how its clients' recovery is tested. Its clients' `gone` is
     /// signalled.
     restart @3 (id: u32) -> () error Error;
+
+    /// What the driver of the device `id` holds and what its threads do,
+    /// as `silica.system.Manager`'s `describe` says it of a service: one
+    /// line per capability and per thread, the first naming the driver as
+    /// `<driver>@<device>`. A long answer comes in parts: `text` holds the
+    /// lines from line `from`, and `next` is where the next part starts (0:
+    /// there is none).
+    describe @4 (id: u32, from: u32) -> (text: string, next: u32) error Error;
 }
