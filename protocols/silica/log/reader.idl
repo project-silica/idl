@@ -1,0 +1,37 @@
+// The log (component D08): what the services print, kept per service and
+// readable by the owner.
+
+/// The system's log, read.
+///
+/// Every service writes its text into a ring in a frame the service manager
+/// gives it (`silica_rt::log` documents the ring); writing never waits, and
+/// a service that writes faster than the log keeps up loses what does not
+/// fit, and says how much when it can again. The log service (`logd`) takes
+/// the text from every ring, keeps the most recent 32 KiB of each service's,
+/// and puts every line on the machine's console as it was written. This is
+/// how the owner (the shell, a remote session) reads it.
+protocol silica.log.Reader version 1 {
+    /// Why a call was refused.
+    enum Error : u32 {
+        /// No service of that name writes to the log.
+        no_such_source = 1,
+    }
+
+    /// A service the log has text from.
+    struct Source {
+        name: string,
+        /// Bytes it has written since the system started (what `read`'s
+        /// `from` counts).
+        written: u64,
+    }
+
+    /// Every service the log takes text from.
+    sources @1 () -> (sources: array<Source>);
+
+    /// The text service `name` wrote from byte `from` on (counted from the
+    /// start of the system; text older than the 32 KiB kept is gone, and the
+    /// answer starts at the oldest kept). As much as fits a message; `next`
+    /// is where the next part starts, equal to the source's `written` when
+    /// there is no more.
+    read @2 (name: string, from: u64) -> (text: string, next: u64) error Error;
+}
