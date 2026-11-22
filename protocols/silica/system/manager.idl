@@ -46,6 +46,15 @@ protocol silica.system.Manager version 1 {
     stop @2 (name: string) -> () error Error;
     start @3 (name: string) -> () error Error;
 
+    /// What the running service `name` holds and what its threads are
+    /// doing, as lines of text: `process <name>: <n> capabilities, <m>
+    /// threads`, then a line per capability (`slot <i>: <type> rights
+    /// <rwxg> bits <b> object <id> badge <b> depth <d>`) and per thread
+    /// (`thread <id>: <state> on processor <c>, at <ip>, waiting on <id>`);
+    /// an object's id is the same in every line about it. A long answer
+    /// comes in parts: `text` holds the lines from line `from`, and `next`
+    /// is where the next part starts (0: there is none).
+    describe @5 (name: string, from: u32) -> (text: string, next: u32) error Error;
     /// Stop every service, in the reverse of the order they started, then
     /// turn the machine off (`reboot`: reset it). Answered only if it
     /// cannot be done.
