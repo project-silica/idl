@@ -25,6 +25,9 @@ protocol silica.device.Manager version 1 {
         network = 4,
         /// A source of random bits; its driver speaks `silica.entropy.Device`.
         entropy = 5,
+        /// A console port, a byte stream to whoever is at the other end;
+        /// its driver speaks `silica.console.Port`.
+        port = 6,
     }
 
     /// A device with a running driver.

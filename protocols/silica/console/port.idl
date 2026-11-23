@@ -1,0 +1,32 @@
+// A console port (component D20's terminal half, M3's virtio-console): a
+// stream of bytes to and from someone at the other end, as every console
+// port driver provides it.
+
+/// A console port: a byte stream between this machine and whoever is at
+/// the other end (a virtual machine's host, a serial line's terminal).
+///
+/// Bytes that arrive travel through a ring in a frame the client shares
+/// (`connect`), as an input device's events do: a record is 8 bytes, the
+/// number of bytes it carries (1 to 7) then the bytes, and the client's
+/// notification is signalled when records were added and the client said
+/// it sleeps (the `silica_ring` rule). The ring holds 256 records; what
+/// arrives while it is full, or before a client connects beyond 4 KiB, is
+/// dropped. Bytes are the other end's, unchecked: text or not, the client
+/// decides.
+///
+/// One client is connected at a time; a new `connect` replaces the old one.
+protocol silica.console.Port version 1 {
+    /// Why a call was refused.
+    enum Error : u32 {
+        /// The frame is not a frame of 4 KiB the driver may write.
+        bad_memory = 1,
+        /// The other end did not take the bytes in time.
+        stalled = 2,
+    }
+    /// Start receiving: `ring` is a frame of 4 KiB for the ring, `arrived`
+    /// is signalled when records were added and the client sleeps.
+    connect @1 (ring: cap<Frame>, arrived: cap<Notification>) -> () error Error;
+    /// Send `data` (at most 2048 bytes a call); answered once the device
+    /// has taken it.
+    write @2 (data: bytes) -> () error Error;
+}
