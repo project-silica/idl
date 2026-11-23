@@ -53,7 +53,11 @@ protocol silica.net.Device version 1 {
     /// Describes the interface. May be called at any time.
     info @1 () -> (info: Info);
 
-    /// Sets up the data path, as `silica.block.Device`'s `connect`.
+    /// Sets up the data path, as `silica.block.Device`'s `connect`, for one
+    /// client at a time: while one is connected another is refused
+    /// (`busy`). Each frame that arrives goes into the next receive buffer
+    /// offered, so two clients would each miss what the other was given;
+    /// the network stack is the interface's one client.
     connect @2 (rings: cap<Frame>, completions: cap<Notification>) -> (requests: cap<Notification>) error Error;
 
     /// Registers a frame of the client's as memory requests may use, under
