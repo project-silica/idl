@@ -721,11 +721,13 @@ struct ToOld(OldServer);
 impl Transport<Cap> for ToOld {
     fn call(
         &mut self,
-        request: &[u8],
+        message: &mut [u8],
+        len: usize,
         caps: CapList<Cap>,
-        reply: &mut [u8],
         reply_caps: &mut CapList<Cap>,
     ) -> Result<usize, TransportError> {
+        let request = message[..len].to_vec();
+        let (request, reply) = (&request[..], message);
         Ok(v1::counter::dispatch(
             &mut self.0,
             request,
@@ -742,11 +744,13 @@ struct ToNew(NewServer);
 impl Transport<Cap> for ToNew {
     fn call(
         &mut self,
-        request: &[u8],
+        message: &mut [u8],
+        len: usize,
         caps: CapList<Cap>,
-        reply: &mut [u8],
         reply_caps: &mut CapList<Cap>,
     ) -> Result<usize, TransportError> {
+        let request = message[..len].to_vec();
+        let (request, reply) = (&request[..], message);
         Ok(v2::counter::dispatch(
             &mut self.0,
             request,

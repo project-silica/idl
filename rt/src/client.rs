@@ -62,28 +62,32 @@ pub enum CallError<E> {
 /// call/reply IPC; host tests implement it with a direct call of a
 /// generated `dispatch`.
 pub trait Transport<C> {
-    /// Sends `request` with the capabilities `caps`, waits for the reply,
-    /// writes the reply into `reply` and its capabilities into
-    /// `reply_caps` (empty on entry), and returns the reply length.
+    /// Sends the request in `message[..len]` with the capabilities `caps`,
+    /// waits for the reply, writes the reply over `message` (whose length
+    /// is at least `MAX_MESSAGE`; the request is dead once sent) and its
+    /// capabilities into `reply_caps` (empty on entry), and returns the
+    /// reply length.
     /// From this call on the transport owns `caps`: it transfers them, or
     /// releases them when the call fails.
     /// Fails only with `Revoked`, `PeerGone` or `Cancelled`; generated code
     /// detects the other [`TransportError`]s itself.
     fn call(
         &mut self,
-        request: &[u8],
+        message: &mut [u8],
+        len: usize,
         caps: CapList<C>,
-        reply: &mut [u8],
         reply_caps: &mut CapList<C>,
     ) -> Result<usize, TransportError>;
 }
 
-/// A transport with its request and reply buffers. Generated clients wrap
-/// one; a reply borrows the client until it is dropped.
+/// A transport with its message buffer: the request is encoded into it and
+/// the reply arrives over it, so a client carries one message's worth of
+/// memory. (Not the IPC buffer itself: every client of a thread shares that
+/// one, and a reply's views outlive the call.) Generated clients wrap one;
+/// a reply borrows the client until it is dropped.
 pub struct ClientCore<T, C> {
     pub transport: T,
-    request: [u8; MAX_MESSAGE],
-    reply: [u8; MAX_MESSAGE],
+    message: [u8; MAX_MESSAGE],
     _caps: PhantomData<fn(C)>,
 }
 
@@ -91,8 +95,7 @@ impl<T, C> ClientCore<T, C> {
     pub fn new(transport: T) -> Self {
         Self {
             transport,
-            request: [0; MAX_MESSAGE],
-            reply: [0; MAX_MESSAGE],
+            message: [0; MAX_MESSAGE],
             _caps: PhantomData,
         }
     }
@@ -110,16 +113,16 @@ impl<T: Transport<C>, C: Capability> ClientCore<T, C> {
         params: Q,
     ) -> Result<R, CallError<E>> {
         let mut caps = CapList::new();
-        let n = encode_request(&mut self.request, &mut caps, ordinal, version, params)
+        let n = encode_request(&mut self.message, &mut caps, ordinal, version, params)
             .map_err(|_| CallError::Transport(TransportError::TooLarge))?;
         let mut reply_caps = CapList::new();
         let m = self
             .transport
-            .call(&self.request[..n], caps, &mut self.reply, &mut reply_caps)
+            .call(&mut self.message, n, caps, &mut reply_caps)
             .map_err(CallError::Transport)?;
         let this: &'s Self = self;
         let msg = this
-            .reply
+            .message
             .get(..m)
             .ok_or(CallError::Transport(TransportError::MalformedReply))?;
         decode_reply(msg, reply_caps, ordinal)

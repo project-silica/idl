@@ -247,7 +247,7 @@ pub fn markdown(p: &Protocol) -> String {
          `Result<{module}::<Method>Reply, silica_idl_rt::CallError<E>>` where `E` is the method's error enum \
          (`core::convert::Infallible` when it has none). `CallError::Error(e)` is the method's own error; \
          `CallError::Transport(t)` one of the common failures. A reply borrows the client until it is dropped: \
-         strings, bytes and arrays in it are views of the client's reply buffer.\n"
+         strings, bytes and arrays in it are views of the client's message buffer (one per client: the request is encoded into it and the reply arrives over it).\n"
     );
     interface(&mut o, p);
     let _ = writeln!(
