@@ -12,11 +12,12 @@ protocol silica.system.Manager version 1 {
     enum Error : u32 {
         /// No service has that name.
         no_such_service = 1,
-        /// The service cannot do that: it is not running (`stop`), or it
-        /// is one the system cannot run without (`stop`, `restart` of the
-        /// device manager).
+        /// The service cannot do that: it is not running (`stop`,
+        /// `restart`), or it is one the system cannot run without (`stop`
+        /// of the device manager).
         refused = 2,
-        /// The caller already gave a log of that name (`add_log`).
+        /// The caller already gave a log of that name, and its ring is
+        /// still there (`add_log`; one whose ring is gone is replaced).
         exists = 3,
         /// There is no log ring at that place (`log_ring`).
         no_such_log = 4,
@@ -69,8 +70,10 @@ protocol silica.system.Manager version 1 {
     /// says: what the owner does to a service that misbehaves, and how its
     /// clients' recovery is tested. Not counted among its failures. Its
     /// clients' capabilities go on working: calls made while it restarts
-    /// wait for the new instance. `refused` for a service that is not
-    /// running, or one the system cannot run without (the device manager).
+    /// wait for the new instance. A machine service (the device manager)
+    /// is given its device memory again, emptied of what it made of it;
+    /// its drivers, its children, end with it and are started again by
+    /// the new one. `refused` for a service that is not running.
     restart @8 (name: string) -> () error Error;
     /// The machine's memory as the service manager has it: `free`, the
     /// bytes it can still give a program it starts (the empty blocks of

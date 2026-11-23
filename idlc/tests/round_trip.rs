@@ -53,11 +53,13 @@ struct Loopback(EchoServer);
 impl Transport<Cap> for Loopback {
     fn call(
         &mut self,
-        request: &[u8],
+        message: &mut [u8],
+        len: usize,
         caps: CapList<Cap>,
-        reply: &mut [u8],
         reply_caps: &mut CapList<Cap>,
     ) -> Result<usize, TransportError> {
+        let request = message[..len].to_vec();
+        let (request, reply) = (&request[..], message);
         Ok(echo::dispatch(
             &mut self.0,
             request,

@@ -1,0 +1,22 @@
+// A source of randomness that is a device (component D14's input): what a
+// hardware random number generator's driver provides.
+
+/// A device that produces random bits: what its driver gives the entropy
+/// service, which is its only client.
+///
+/// The bytes are the device's, as it produced them: the driver neither
+/// tests nor conditions them, and the entropy service never uses them alone
+/// (it mixes them into what it already has, so a device that lies, or a
+/// driver that does, makes the result no weaker). A device may give fewer
+/// bytes than asked for, and none while it gathers more.
+protocol silica.entropy.Device version 1 {
+    /// Why a call was refused.
+    enum Error : u32 {
+        /// The device did not answer in time, or broke its protocol; its
+        /// driver ends and the device manager starts another.
+        failed = 1,
+    }
+
+    /// Up to `count` bytes from the device (`count` at most 256).
+    read @1 (count: u32) -> (data: bytes) error Error;
+}

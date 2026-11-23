@@ -123,11 +123,13 @@ impl<S> Loopback<S> {
 impl Transport<Cap> for Loopback<EchoServer> {
     fn call(
         &mut self,
-        request: &[u8],
+        message: &mut [u8],
+        len: usize,
         caps: CapList<Cap>,
-        reply: &mut [u8],
         reply_caps: &mut CapList<Cap>,
     ) -> Result<usize, TransportError> {
+        let request = message[..len].to_vec();
+        let (request, reply) = (&request[..], message);
         self.calls += 1;
         self.caps_in = caps.len();
         Ok(echo::dispatch(
@@ -161,11 +163,13 @@ impl holder::Server<Cap> for HoldServer {
 impl Transport<Cap> for Loopback<HoldServer> {
     fn call(
         &mut self,
-        request: &[u8],
+        message: &mut [u8],
+        len: usize,
         caps: CapList<Cap>,
-        reply: &mut [u8],
         reply_caps: &mut CapList<Cap>,
     ) -> Result<usize, TransportError> {
+        let request = message[..len].to_vec();
+        let (request, reply) = (&request[..], message);
         self.calls += 1;
         self.caps_in = caps.len();
         Ok(holder::dispatch(
@@ -187,9 +191,9 @@ struct Gone {
 impl Transport<Cap> for Gone {
     fn call(
         &mut self,
-        _request: &[u8],
+        _message: &mut [u8],
+        _len: usize,
         caps: CapList<Cap>,
-        _reply: &mut [u8],
         _reply_caps: &mut CapList<Cap>,
     ) -> Result<usize, TransportError> {
         self.caps_in = caps.len();
