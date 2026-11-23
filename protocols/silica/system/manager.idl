@@ -63,6 +63,21 @@ protocol silica.system.Manager version 1 {
     /// turn the machine off (`reboot`: reset it). Answered only if it
     /// cannot be done.
     shutdown @4 (reboot: bool) -> () error Error;
+    /// End the running service `name` at once, as if it had failed (its
+    /// memory and capabilities taken away, its clients' calls in progress
+    /// answered `peer_gone`), and start it again, whatever its declaration
+    /// says: what the owner does to a service that misbehaves, and how its
+    /// clients' recovery is tested. Not counted among its failures. Its
+    /// clients' capabilities go on working: calls made while it restarts
+    /// wait for the new instance. `refused` for a service that is not
+    /// running, or one the system cannot run without (the device manager).
+    restart @8 (name: string) -> () error Error;
+    /// The machine's memory as the service manager has it: `free`, the
+    /// bytes it can still give a program it starts (the empty blocks of
+    /// programs that ended count, so it comes back as they end), and
+    /// `held`, the bytes the running services were given. A service
+    /// restarted any number of times leaves `free` as it found it.
+    memory @9 () -> (free: u64, held: u64);
 
     /// Give a program the calling service runs itself (a driver the device
     /// manager starts) a log of its own, kept and read like a service's:
