@@ -1,0 +1,41 @@
+// The entropy service (component D14): random bytes for everything that
+// must not be guessed.
+
+/// Random bytes nobody can predict: for keys, nonces, identifiers and the
+/// layout of a program's memory.
+///
+/// The service is seeded at boot from what the loader gathered (the
+/// firmware's generator, the processor's, timing jitter: `RootInfo`'s
+/// `entropy`), through a key the service manager derives for it, and mixes
+/// in what every randomness device gives (`silica.entropy.Device`) as soon
+/// as one is there and again before an answer when the last mixing is old.
+/// Output is a keyed BLAKE2s of a counter; the key is replaced after every
+/// answer, so what was given cannot be worked out from the service's state
+/// afterwards. A source that lies weakens nothing: everything is mixed into
+/// what is there already.
+protocol silica.entropy.Source version 1 {
+    /// Why a call was refused.
+    enum Error : u32 {
+        /// No source this system trusts has gone in yet: the boot gathered
+        /// only timing jitter, and no device has answered. The bytes would
+        /// be guessable; ask again later.
+        not_seeded = 1,
+    }
+
+    /// What went into the service.
+    struct Status {
+        /// The boot gave it entropy from a source it trusts (`RootInfo`'s
+        /// `entropy_sources`): the firmware's generator or the processor's.
+        boot: bool,
+        /// Bytes mixed in from devices since the system started.
+        device_bytes: u64,
+        /// How many times device bytes were mixed in.
+        mixes: u32,
+    }
+
+    /// `count` random bytes (at most 256 a call).
+    fill @1 (count: u32) -> (data: bytes) error Error;
+
+    /// What went in.
+    status @2 () -> (status: Status);
+}
