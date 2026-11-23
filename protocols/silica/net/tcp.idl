@@ -1,0 +1,122 @@
+// TCP for programs (components G01, G03): what the network stack provides
+// to everything that talks over the network.
+
+/// TCP connections, listened for and made.
+///
+/// Provided by the network stack (`netd`). The calls are the control path:
+/// listening, accepting, connecting and letting go. Bytes do not travel as
+/// calls. A caller lends the stack memory of its own once (`add_memory`),
+/// and each connection's two byte streams (`silica_rt::ring`'s
+/// `StreamProducer` and `StreamConsumer`; the `silica_net::tcp` crate
+/// module wraps all of this) lie in a block of it the caller names when it
+/// accepts or connects, so that a connection costs the stack no mapping
+/// and a server's millionth connection is as cheap as its first:
+///
+/// - a block is 2^k bytes, k from 12 to 24 (4 KiB to 16 MiB), at an offset
+///   in the memory that is a multiple of its size, zeroed by the caller
+///   before it names it;
+/// - bytes 0 to 63 of a block are the receive stream's header (the stack
+///   writes, the caller reads), bytes 64 to 127 the transmit stream's (the
+///   caller writes, the stack reads);
+/// - the rest is split in two equal data areas of C = (2^k - 128) / 2
+///   bytes: the receive stream's from byte 128, the transmit stream's
+///   from byte 128 + C.
+///
+/// Listeners and connections are their caller's: another program that
+/// names one gets `no_such`.
+///
+/// The stack signals the caller's notification (`wake`) when it put bytes
+/// in the receive stream, made room in the transmit stream, or ended the
+/// receive stream, each only when the caller said in the stream's header
+/// that it sleeps (the streams' own protocol). The caller signals the
+/// notification it got back (`requests`) when it wrote to the transmit
+/// stream or closed it, likewise only when the stack said it sleeps.
+///
+/// Ending: the caller closes its transmit stream (reason 0) when it has
+/// nothing more to send, and the stack sends what is left, then a FIN. The
+/// stack closes the receive stream when the peer has nothing more to send
+/// (reason 0, after the last byte), or when the connection failed, with a
+/// `Reason`. The caller then lets go of the connection (`close`), which
+/// resets it if it had not ended in order. Nothing a caller does with its
+/// streams can reach another connection or the stack's state: the stack
+/// copies bytes out of and into them and checks every position it reads.
+protocol silica.net.Tcp version 1 {
+    /// Why a call was refused.
+    enum Error : u32 {
+        /// The memory is not a usable frame, or is already added
+        /// (`add_memory`); or the block named lies outside it, is
+        /// misaligned or of a size not allowed, or overlaps another
+        /// connection's (`accept`, `connect`).
+        bad_memory = 1,
+        /// Something already listens on that port.
+        in_use = 2,
+        /// No connection is waiting to be accepted: wait for the
+        /// listener's notification.
+        would_block = 3,
+        /// No listener or connection has that number.
+        no_such = 4,
+        /// The stack has no room for another listener or connection.
+        no_room = 5,
+        /// The stack has no address yet (no interface, or DHCP has not
+        /// given one).
+        no_address = 6,
+        /// A port or address that cannot be used (port 0, address 0).
+        bad_argument = 7,
+    }
+
+    /// Why the stack ended a receive stream other than in order: the
+    /// stream's close reason.
+    enum Reason : u32 {
+        /// The peer sent its FIN: everything it sent has arrived.
+        finished = 0,
+        /// The peer reset the connection.
+        reset = 1,
+        /// Nobody listens at the address and port connected to.
+        refused = 2,
+        /// The peer stopped answering.
+        timed_out = 3,
+        /// The caller broke a stream's header (a position that makes no
+        /// sense): the connection was reset.
+        broken = 4,
+    }
+
+    /// An IPv4 address and a port.
+    struct Endpoint {
+        /// The address, first byte highest (10.0.2.2 is 0x0A000202).
+        address: u32,
+        port: u16,
+    }
+
+    /// Lend the stack `memory` (a frame of 64 KiB to 256 MiB, read and
+    /// written) for the caller's connections. A caller adds memory once;
+    /// it takes it back by revoking it (or by ending), after which its
+    /// connections' streams read as empty.
+    add_memory @6 (memory: cap<Frame>) -> () error Error;
+
+    /// Listen for connections to `port` on every address of the machine.
+    /// The stack completes the handshakes itself and keeps up to `backlog`
+    /// (at least 1) connections waiting, signalling `ready` when one
+    /// arrives; more arrive refused. Returns the listener's number.
+    listen @1 (port: u16, backlog: u32, ready: cap<Notification>) -> (listener: u32) error Error;
+
+    /// Take the oldest connection waiting on `listener`, its streams in
+    /// the block of 2^`bits` bytes at `offset` in the caller's memory, the
+    /// notification `wake` signalled for it (see above). `would_block`
+    /// when none is waiting.
+    accept @2 (listener: u32, offset: u64, bits: u8, wake: cap<Notification>) -> (connection: u32, peer: Endpoint, requests: cap<Notification>) error Error;
+
+    /// Connect to `peer`, the streams in the block of 2^`bits` bytes at
+    /// `offset`, `wake` signalled. Returns at once: the transmit stream
+    /// may be written now and its bytes go once the connection is made; a
+    /// connection that cannot be made ends the receive stream with its
+    /// `Reason`.
+    connect @3 (peer: Endpoint, offset: u64, bits: u8, wake: cap<Notification>) -> (connection: u32, requests: cap<Notification>) error Error;
+
+    /// Let go of `connection`: reset if it had not ended in order, and its
+    /// block and notification are no longer used: the caller may use the
+    /// block for another connection.
+    close @4 (connection: u32) -> () error Error;
+
+    /// Stop listening; connections still waiting are reset.
+    unlisten @5 (listener: u32) -> () error Error;
+}
