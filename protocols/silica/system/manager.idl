@@ -7,7 +7,7 @@
 /// Provided by the service manager (the root task). Every running program
 /// of the system is one of its services or a child of one; a service is
 /// named as its declaration names it (the boot archive's services list).
-protocol silica.system.Manager version 1 {
+protocol silica.system.Manager version 2 {
     /// Why a call was refused.
     enum Error : u32 {
         /// No service has that name.
@@ -19,7 +19,7 @@ protocol silica.system.Manager version 1 {
         /// The caller already gave a log of that name, and its ring is
         /// still there (`add_log`; one whose ring is gone is replaced).
         exists = 3,
-        /// There is no log ring at that place (`log_ring`).
+        /// Answered by `log_ring` alone, which version 2 retired.
         no_such_log = 4,
     }
 
@@ -95,9 +95,10 @@ protocol silica.system.Manager version 1 {
     /// answer is `refused`.
     add_log @6 (name: string, ring: cap<Frame>) -> (wake: cap<Notification>) error Error;
 
-    /// For the log service alone (`refused` to any other caller): the
-    /// `index`th log given with `add_log` (0 first), its source's name and
-    /// its ring; `no_such_log` past the last. The log service is told that
-    /// there are new ones by its notification.
-    log_ring @7 (index: u32) -> (name: string, ring: cap<Frame>) error Error;
+    /// `log_ring`, by which the log service asked for the rings given with
+    /// `add_log`, retired in version 2: the service manager waits for the
+    /// log service's flushes, so the log service must not wait for it. It
+    /// finds the rings in its CapSpace and their names in a directory the
+    /// service manager writes (`silica_rt::log::directory`).
+    reserved @7;
 }
