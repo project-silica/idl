@@ -64,4 +64,13 @@ protocol silica.device.Manager version 1 {
     /// lines from line `from`, and `next` is where the next part starts (0:
     /// there is none).
     describe @4 (id: u32, from: u32) -> (text: string, next: u32) error Error;
+
+    /// Signal `changed` whenever a device of class `class` gains a running
+    /// driver or loses one: it arrived or was taken out, or its driver
+    /// ended or started again. A client that waits for a device watches
+    /// first and then calls `list`, and calls `list` again each time
+    /// `changed` is signalled: a change between the two is never missed,
+    /// and a client with nothing to wait for is not woken. The device
+    /// manager keeps the capability until signalling it fails.
+    watch @5 (class: Class, changed: cap<Notification>) -> ();
 }
