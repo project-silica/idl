@@ -23,7 +23,12 @@
 /// buffers it had not filled are offered again to the provider that
 /// replaces it, and transmit requests it had not completed may be sent
 /// again (a frame may then go out twice, which networks allow).
-protocol silica.net.Device version 2 {
+/// An interface may offload work the client would do for each frame
+/// (`Info::offloads`): sum a frame's checksum for it, and cut a TCP over
+/// IPv4 frame longer than the MTU into frames that fit. A transmit request
+/// asks for either in its record (the `silica_net` crate's documentation);
+/// a client asks only for what the interface said it does.
+protocol silica.net.Device version 3 {
     /// Why a call was refused.
     enum Error : u32 {
         /// Another client is connected, or this one already is.
@@ -53,6 +58,15 @@ protocol silica.net.Device version 2 {
         /// size for all of them (e1000e: 2048) writes up to that size,
         /// whatever the frame. 0 (a version 1 provider): `mtu` + 14.
         receive_bytes: u32,
+        /// What the interface does for a transmit that asks (bits): 1, a
+        /// checksum (the ones' complement sum of the bytes from a start to
+        /// the frame's end, added to the 16 bits at a position after the
+        /// start, which hold the pseudo-header's sum); 2, TCP over IPv4
+        /// segmentation (needs 1). 0: neither.
+        offloads: u32,
+        /// The longest frame a segmentation request may give, from its
+        /// Ethernet header to its last byte (0 without segmentation).
+        segment_bytes: u32,
     }
 
     /// Describes the interface. May be called at any time.
