@@ -23,7 +23,7 @@
 /// buffers it had not filled are offered again to the provider that
 /// replaces it, and transmit requests it had not completed may be sent
 /// again (a frame may then go out twice, which networks allow).
-protocol silica.net.Device version 1 {
+protocol silica.net.Device version 2 {
     /// Why a call was refused.
     enum Error : u32 {
         /// Another client is connected, or this one already is.
@@ -48,6 +48,11 @@ protocol silica.net.Device version 1 {
         mtu: u32,
         /// Whether the link is up now (see the ring's link records).
         link_up: bool,
+        /// The bytes every receive buffer must have, at least `mtu` + 14:
+        /// what the device may write into one. A device told one buffer
+        /// size for all of them (e1000e: 2048) writes up to that size,
+        /// whatever the frame. 0 (a version 1 provider): `mtu` + 14.
+        receive_bytes: u32,
     }
 
     /// Describes the interface. May be called at any time.
