@@ -115,9 +115,16 @@ protocol silica.net.Tcp version 1 {
     /// `Reason`.
     connect @3 (peer: Endpoint, offset: u64, bits: u8, wake: cap<Notification>) -> (connection: u32, requests: cap<Notification>) error Error;
 
-    /// Let go of `connection`: reset if it had not ended in order, and its
-    /// block and notification are no longer used: the caller may use the
-    /// block for another connection.
+    /// Let go of `connection`. If the caller ended its transmit stream and
+    /// left nothing received unread, the connection ends in order: what it
+    /// wrote is sent, then the FIN, as a socket closed on Linux does;
+    /// otherwise it is reset. Answered `would_block` while bytes the caller
+    /// wrote before ending its stream are not all taken yet (the peer's
+    /// window is shut): the caller keeps the block and asks again after the
+    /// stack signals the connection's `wake`, which it does when it has
+    /// taken the last of them (`silica_net::tcp` does both). Once answered,
+    /// the block and the notification are no longer used: the caller may
+    /// use the block for another connection.
     close @4 (connection: u32) -> () error Error;
 
     /// Stop listening; connections still waiting are reset.
