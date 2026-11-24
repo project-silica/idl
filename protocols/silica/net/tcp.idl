@@ -88,9 +88,12 @@ protocol silica.net.Tcp version 1 {
     }
 
     /// Lend the stack `memory` (a frame of 64 KiB to 256 MiB, read and
-    /// written) for the caller's connections. A caller adds memory once;
-    /// it takes it back by revoking it (or by ending), after which its
-    /// connections' streams read as empty.
+    /// written) for the caller's connections. A caller adds memory once.
+    /// When it takes the memory back (revoking it, or ending), the stack
+    /// lets go of everything the caller had: its listeners, their ports
+    /// free again, and its connections, reset. A second `add_memory` from
+    /// the same caller is taken as a new instance of it (a service started
+    /// again), and everything the last one had is let go of first.
     add_memory @6 (memory: cap<Frame>) -> () error Error;
 
     /// Listen for connections to `port` on every address of the machine.

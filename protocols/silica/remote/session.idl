@@ -1,0 +1,38 @@
+// The remote management session (component D21): how an owner on another
+// machine inspects, steers and updates a Silica machine.
+
+/// A remote management session: the machine's own protocols, called from
+/// another machine.
+///
+/// Provided by the remote management service (`remote`) on TCP port 22 to
+/// an owner whose public key the machine was given. A session is a Noise
+/// IK handshake (`Noise_IK_25519_ChaChaPoly_BLAKE2s`, prologue
+/// `silica.remote 1`), then messages each sealed with the session's keys.
+/// Every message on the TCP connection is its length (2 bytes, big-endian)
+/// and that many bytes. The first is the owner's handshake message (no
+/// payload), the second the machine's answer (no payload); a machine that
+/// does not know the owner's key, or cannot open the message, closes the
+/// connection without answering. After them, each sealed message's
+/// plaintext is one call or one answer:
+///
+/// - a call: a channel (1 byte), then an IDL request (`spec/IDL.md`,
+///   header and payload, at most 4000 bytes, carrying no capability);
+/// - its answer: the same channel, a status (1 byte: 0 the IDL reply
+///   follows; 1 the protocol's provider went away during the call,
+///   `peer_gone`; 2 the machine holds no capability to it, `revoked`;
+///   3 no such channel), then the IDL reply.
+///
+/// The owner sends one call and waits for its answer before the next.
+/// Channel 0 is this protocol; channel n is the n-th name `protocols`
+/// answers (from 1): `silica.system.Manager` and `silica.log.Reader`, so
+/// that what the shell does at the console a session does from afar
+/// (`silica-remote update` sends a program with the manager's `stage` and
+/// `update`, one piece a call). A call that needs a capability cannot be
+/// made from another machine (`add_log`): its provider sees the capability
+/// missing and refuses it.
+/// `silica_remote` (system/remote/proto) implements the framing, and the
+/// host's `silica-remote` is a client written on it.
+protocol silica.remote.Session version 1 {
+    /// The protocols this session carries, `names[i]` on channel `i + 1`.
+    protocols @1 () -> (names: array<string>);
+}

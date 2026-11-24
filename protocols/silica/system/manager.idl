@@ -7,7 +7,7 @@
 /// Provided by the service manager (the root task). Every running program
 /// of the system is one of its services or a child of one; a service is
 /// named as its declaration names it (the boot archive's services list).
-protocol silica.system.Manager version 2 {
+protocol silica.system.Manager version 3 {
     /// Why a call was refused.
     enum Error : u32 {
         /// No service has that name.
@@ -21,6 +21,14 @@ protocol silica.system.Manager version 2 {
         exists = 3,
         /// Answered by `log_ring` alone, which version 2 retired.
         no_such_log = 4,
+        /// The bytes given are not a program this machine runs (`update`,
+        /// version 3): not an ELF image for its processor, or one whose
+        /// parts do not fit where it says they go.
+        not_a_program = 5,
+        /// Past the largest program the service manager takes (16 MiB), past
+        /// what the caller staged, or more staged by all callers at once
+        /// than it keeps (32 MiB) (`stage`, `update`; version 3).
+        too_large = 6,
     }
 
     /// What a service is doing.
@@ -41,6 +49,13 @@ protocol silica.system.Manager version 2 {
         failures: u32,
         /// The protocol it provides, or the empty string.
         provides: string,
+        /// The BLAKE2s-256 hash of the program it runs, or is started on
+        /// next (version 3): what an owner compares with the program they
+        /// meant to run.
+        program: bytes,
+        /// That program came by `update` (version 3), not with the boot
+        /// archive.
+        updated: bool,
     }
 
     /// Every declared service and what it is doing.
@@ -94,6 +109,35 @@ protocol silica.system.Manager version 2 {
     /// logs are given in all; past that, and with no log service, the
     /// answer is `refused`.
     add_log @6 (name: string, ring: cap<Frame>) -> (wake: cap<Notification>) error Error;
+
+    /// Write `data` at byte `at` of the program the caller is sending (at
+    /// most 3,900 bytes a call): the service manager keeps one for each
+    /// caller, in its own memory, until `update` takes it or the caller
+    /// starts another at byte 0. A program comes in pieces rather than in a
+    /// frame the caller lends, so the service manager never reads memory
+    /// that its owner can take back while it reads.
+    stage @10 (at: u64, data: bytes) -> () error Error;
+    /// Run the service `name` from now on on the first `length` bytes the
+    /// caller staged (an ELF image for this machine), in place of the
+    /// program it runs: what installs a new version of a service while the
+    /// system runs. A running service is ended and started on the new
+    /// program, as by `restart`; one that is not running starts on it when
+    /// it is next started. `not_a_program` for bytes that are not one, and
+    /// nothing changes.
+    ///
+    /// An update is undone by itself when it does not work. A new program
+    /// that cannot be started is answered `refused`, and the service runs
+    /// its last program again. One that fails (faults, or ends with a
+    /// status other than 0) within 10 s of starting is replaced by the
+    /// program the service ran before, which is started again, `list` shows
+    /// it, and the log says why. The boot archive is not changed: the
+    /// machine boots with the archive's program until the system has
+    /// storage to keep an update in (M5). Each `update` takes the staged
+    /// program, whatever its answer.
+    update @11 (name: string, length: u64) -> () error Error;
+    /// Run the service `name` on its program in the boot archive again,
+    /// undoing every `update` of it, and restart it on that if it runs.
+    revert @12 (name: string) -> () error Error;
 
     /// `log_ring`, by which the log service asked for the rings given with
     /// `add_log`, retired in version 2: the service manager waits for the
