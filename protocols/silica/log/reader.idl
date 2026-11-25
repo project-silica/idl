@@ -35,6 +35,8 @@ protocol silica.log.Reader version 1 {
     /// start of the system; text older than the 32 KiB kept is gone, and the
     /// answer starts at the oldest kept). As much as fits a message; `next`
     /// is where the next part starts, equal to the source's `written` when
-    /// there is no more.
+    /// there is no more. A malformed UTF-8 byte reads as one ASCII question
+    /// mark, so byte offsets still match the returned text. A valid character
+    /// crossing the reply size limit is returned whole in the next reply.
     read @2 (name: string, from: u64) -> (text: string, next: u64) error Error;
 }
