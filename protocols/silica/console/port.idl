@@ -14,14 +14,19 @@
 /// dropped. Bytes are the other end's, unchecked: text or not, the client
 /// decides.
 ///
-/// One client is connected at a time; a new `connect` replaces the old one.
-protocol silica.console.Port version 1 {
+/// One client is connected at a time: a `connect` while the connected
+/// client is still there (its ring not taken back) is refused, so nobody
+/// else who holds the driver's endpoint can take its traffic over
+/// (version 2; before, a new `connect` replaced the old one unnoticed).
+protocol silica.console.Port version 2 {
     /// Why a call was refused.
     enum Error : u32 {
         /// The frame is not a frame of 4 KiB the driver may write.
         bad_memory = 1,
         /// The other end did not take the bytes in time.
         stalled = 2,
+        /// Another client is connected (version 2).
+        in_use = 3,
     }
     /// Start receiving: `ring` is a frame of 4 KiB for the ring, `arrived`
     /// is signalled when records were added and the client sleeps.

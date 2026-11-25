@@ -7,7 +7,15 @@
 /// Provided by the service manager (the root task). Every running program
 /// of the system is one of its services or a child of one; a service is
 /// named as its declaration names it (the boot archive's services list).
-protocol silica.system.Manager version 3 {
+///
+/// What a caller may do is what its capability's scopes say
+/// (`silica_protocols::scope`, given by its declaration): `observe`
+/// (`list`, `describe`, `memory`), `control` (`start`, `stop`, `restart`),
+/// `update` (`stage`, `update`, `revert`), `power` (`shutdown`) and `logs`
+/// (`add_log`). Anything else is `refused`; `list` and `memory` answer a
+/// caller without `observe` with nothing (version 4; before, every holder
+/// could do everything, the device manager included).
+protocol silica.system.Manager version 4 {
     /// Why a call was refused.
     enum Error : u32 {
         /// No service has that name.

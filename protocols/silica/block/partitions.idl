@@ -10,13 +10,21 @@
 /// partition again, from the driver started in its place. Requests go to
 /// the driver directly: this service is on the way to a partition, not on
 /// the way of its requests.
-protocol silica.block.Partitions version 1 {
+///
+/// A capability to the service is authority over every partition of every
+/// disk, as far as its scopes (`silica_protocols::scope`) say: `list`,
+/// and `open` (version 2; before, any holder could open any partition).
+/// It is the owner's tools'; a program that needs one partition is given
+/// the block capability `open` returns, which reaches that partition only.
+protocol silica.block.Partitions version 2 {
     /// Why a call was refused.
     enum Error : u32 {
         /// No partition has that identity.
         no_such_partition = 1,
         /// Its disk has no driver now (it may be on its way).
         gone = 2,
+        /// The caller's capability does not allow it (version 2).
+        refused = 3,
     }
 
     /// A partition.

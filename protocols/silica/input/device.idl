@@ -13,12 +13,17 @@
 /// keys are dropped. Layouts (which character a key makes) are the client's
 /// business, not the driver's.
 ///
-/// One client is connected at a time; a new `connect` replaces the old one.
-protocol silica.input.Device version 1 {
+/// One client is connected at a time: a `connect` while the connected
+/// client is still there (its ring not taken back) is refused, so nobody
+/// else who holds the driver's endpoint can take its keystrokes over
+/// (version 2; before, a new `connect` replaced the old one unnoticed).
+protocol silica.input.Device version 2 {
     /// Why a call was refused.
     enum Error : u32 {
         /// The frame is not a frame of 4 KiB the driver may write.
         bad_memory = 1,
+        /// Another client is connected (version 2).
+        in_use = 2,
     }
 
     /// What kind of device it is.
