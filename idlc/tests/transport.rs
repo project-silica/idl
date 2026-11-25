@@ -453,14 +453,24 @@ fn a_field_unknown_to_the_provider_is_refused_not_ignored() {
     };
     let mut reply = [0xeeu8; silica_idl_rt::MAX_MESSAGE];
     let mut rcl: CapList<Cap> = CapList::new();
-    let n = echo::dispatch(&mut server, &V1_AND_MORE, CapList::new(), &mut reply, &mut rcl);
+    let n = echo::dispatch(
+        &mut server,
+        &V1_AND_MORE,
+        CapList::new(),
+        &mut reply,
+        &mut rcl,
+    );
     assert_eq!(&reply[..n], &V9, "dispatch's reply bytes");
     assert!(rcl.is_empty());
     assert_eq!(TransportError::UnknownField.to_string(), "unknown_field");
     // The caller sees it as such.
     assert_eq!(
-        silica_idl_rt::decode_reply::<Cap, echo::EchoReply, core::convert::Infallible>(&V9, CapList::new(), 1)
-            .unwrap_err(),
+        silica_idl_rt::decode_reply::<Cap, echo::EchoReply, core::convert::Infallible>(
+            &V9,
+            CapList::new(),
+            1
+        )
+        .unwrap_err(),
         CallError::Transport(TransportError::UnknownField)
     );
 }

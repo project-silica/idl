@@ -138,7 +138,10 @@ fn known_answer_vectors() {
         v2.clone().encode_message(b, c).unwrap()
     });
     assert_eq!(EchoReply::decode_message(&V2, none.clone()), Ok(v2.clone()));
-    assert_eq!(EchoReply::decode_message(&V2_WRITTEN_OUT, none.clone()), Ok(v2));
+    assert_eq!(
+        EchoReply::decode_message(&V2_WRITTEN_OUT, none.clone()),
+        Ok(v2)
+    );
 
     // V3.
     let v3 = EchoRecordsRequest {

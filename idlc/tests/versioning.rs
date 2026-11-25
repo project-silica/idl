@@ -826,11 +826,56 @@ fn version_skew() {
     // asked for a step held 3 times within a window, was told it was done.
     // Nested (a struct's appended field) or at the top, each is refused.
     for (step, repeat, window, strict) in [
-        (v2::counter::Step { by: 4, label: "four", mode: v2::counter::Mode::Up }, 0, None, false),
-        (v2::counter::Step { by: 4, label: "", mode: v2::counter::Mode::Hold }, 0, None, false),
-        (v2::counter::Step { by: 4, label: "", mode: v2::counter::Mode::Up }, 3, None, false),
-        (v2::counter::Step { by: 4, label: "", mode: v2::counter::Mode::Up }, 0, Some(v2::counter::Window { lo: 1, hi: 2 }), false),
-        (v2::counter::Step { by: 4, label: "", mode: v2::counter::Mode::Up }, 0, None, true),
+        (
+            v2::counter::Step {
+                by: 4,
+                label: "four",
+                mode: v2::counter::Mode::Up,
+            },
+            0,
+            None,
+            false,
+        ),
+        (
+            v2::counter::Step {
+                by: 4,
+                label: "",
+                mode: v2::counter::Mode::Hold,
+            },
+            0,
+            None,
+            false,
+        ),
+        (
+            v2::counter::Step {
+                by: 4,
+                label: "",
+                mode: v2::counter::Mode::Up,
+            },
+            3,
+            None,
+            false,
+        ),
+        (
+            v2::counter::Step {
+                by: 4,
+                label: "",
+                mode: v2::counter::Mode::Up,
+            },
+            0,
+            Some(v2::counter::Window { lo: 1, hi: 2 }),
+            false,
+        ),
+        (
+            v2::counter::Step {
+                by: 4,
+                label: "",
+                mode: v2::counter::Mode::Up,
+            },
+            0,
+            None,
+            true,
+        ),
     ] {
         assert_eq!(
             new.add(step, repeat, window, strict).unwrap_err(),

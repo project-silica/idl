@@ -466,7 +466,11 @@ impl Gen<'_> {
         // Fields at the end that hold their defaults are left out: a
         // decoder gives them back from their absence, and an older
         // provider sees exactly the request it knows (`spec/IDL.md` 3, 4).
-        let keep = if fields.is_empty() { "let keep" } else { "let mut keep" };
+        let keep = if fields.is_empty() {
+            "let keep"
+        } else {
+            "let mut keep"
+        };
         let _ = writeln!(o, "            {keep} = e.len();");
         for f in fields {
             let _ = writeln!(
@@ -489,7 +493,11 @@ impl Gen<'_> {
             .iter()
             .map(|f| format!("{RT}::Encode::<C>::is_default(&self.{})", f.name.name))
             .collect();
-        let all = if all.is_empty() { "true".to_string() } else { all.join(" && ") };
+        let all = if all.is_empty() {
+            "true".to_string()
+        } else {
+            all.join(" && ")
+        };
         let _ = writeln!(o, "            {all}");
         let _ = writeln!(o, "        }}");
         let moving: Vec<&Field> = fields

@@ -124,7 +124,7 @@ impl<'a, T: Encode<C> + Decode<'a, C>, C> Encode<C> for Array<'a, T, C> {
     }
 
     fn is_default(&self) -> bool {
-        self.len() == 0
+        self.is_empty()
     }
 }
 
