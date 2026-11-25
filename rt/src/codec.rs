@@ -39,6 +39,13 @@ pub enum DecodeError {
     TooDeep,
     /// A field list ended before a field that has no default.
     MissingField,
+    /// A request carries fields after those of every list this provider's
+    /// version knows: a newer client asked for something this version
+    /// cannot honour (encoders leave out trailing fields that hold their
+    /// default, so only a field that says something arrives). Answered
+    /// with status `unknown_field`; never an error of a reply, whose
+    /// unknown fields are skipped.
+    UnknownField,
     /// Bytes after the payload's field list.
     TrailingBytes,
 }
@@ -58,6 +65,7 @@ impl fmt::Display for DecodeError {
             DecodeError::UnusedCap => "capability not referenced",
             DecodeError::TooDeep => "field lists nested too deep",
             DecodeError::MissingField => "missing field without default",
+            DecodeError::UnknownField => "field unknown to this version",
             DecodeError::TrailingBytes => "bytes after the payload",
         };
         f.write_str(s)
@@ -154,6 +162,15 @@ impl<'b, C> Encoder<'b, C> {
         Ok(at)
     }
 
+    /// Forget what was written after byte `to` of the current field list:
+    /// fields at its end that hold their defaults, which a decoder gives
+    /// back from their absence (`spec/IDL.md` section 3). Never anything
+    /// that carries a capability (no such field has a default).
+    pub fn truncate(&mut self, to: usize) {
+        debug_assert!(to <= self.pos);
+        self.pos = to.min(self.pos);
+    }
+
     /// Ends the field list started at `at`, writing its body length.
     pub fn end_list(&mut self, at: usize) -> Result<(), EncodeError> {
         let body = self.pos - at - 4;
@@ -186,6 +203,9 @@ pub struct Decoder<'a, 'c, C> {
     caps: &'c [Cell<Option<C>>],
     next_cap: usize,
     depth: u32,
+    /// Refuse a field list longer than its fields ([`DecodeError::UnknownField`]):
+    /// how a provider decodes a request.
+    strict: bool,
 }
 
 impl<C> Clone for Decoder<'_, '_, C> {
@@ -211,6 +231,7 @@ impl<'a, 'c, C> Decoder<'a, 'c, C> {
             caps,
             next_cap: 0,
             depth: 0,
+            strict: false,
         }
     }
 
@@ -296,11 +317,23 @@ impl<'a, 'c, C> Decoder<'a, 'c, C> {
     }
 
     /// Ends the current field list, skipping fields this version does not
-    /// know (a newer peer).
-    pub fn end_list(&mut self, saved: usize) {
+    /// know (a newer peer); in a request ([`Decoder::refuse_unknown`]) they
+    /// are [`DecodeError::UnknownField`].
+    pub fn end_list(&mut self, saved: usize) -> Result<(), DecodeError> {
+        if self.strict && self.pos != self.end {
+            return Err(DecodeError::UnknownField);
+        }
         self.pos = self.end;
         self.end = saved;
         self.depth -= 1;
+        Ok(())
+    }
+
+    /// Refuse fields this version does not know from here on: a provider
+    /// decoding a request does, so a newer client's field is never ignored
+    /// (`spec/IDL.md` section 4).
+    pub fn refuse_unknown(&mut self) {
+        self.strict = true;
     }
 
     /// Reads a capability index, which must be the next index in encoding
@@ -353,6 +386,7 @@ impl<'a, 'c, C> Decoder<'a, 'c, C> {
             caps: &[],
             next_cap: 0,
             depth: self.depth,
+            strict: self.strict,
         }
     }
 
@@ -378,6 +412,13 @@ impl<'a, 'c, C> Decoder<'a, 'c, C> {
 /// order.
 pub trait Encode<C> {
     fn encode(&self, e: &mut Encoder<'_, C>) -> Result<(), EncodeError>;
+
+    /// Whether this is the value an absent field takes ([`Decode::missing`]):
+    /// a field list leaves such fields out at its end. `false` for a type
+    /// without a default.
+    fn is_default(&self) -> bool {
+        false
+    }
 
     /// Moves every capability of `self` into `caps`, in encoding order. The
     /// default is for values that carry none.
@@ -411,6 +452,9 @@ macro_rules! int {
             fn encode(&self, e: &mut Encoder<'_, C>) -> Result<(), EncodeError> {
                 e.put(&self.to_le_bytes())
             }
+            fn is_default(&self) -> bool {
+                *self == 0
+            }
         }
         impl<'a, C> Decode<'a, C> for $t {
             fn decode(d: &mut Decoder<'a, '_, C>) -> Result<Self, DecodeError> {
@@ -428,6 +472,9 @@ int!(u8, u16, u32, u64, i8, i16, i32, i64);
 impl<C> Encode<C> for bool {
     fn encode(&self, e: &mut Encoder<'_, C>) -> Result<(), EncodeError> {
         e.put(&[u8::from(*self)])
+    }
+    fn is_default(&self) -> bool {
+        !*self
     }
 }
 
@@ -449,6 +496,9 @@ impl<C> Encode<C> for &str {
         e.put_len(self.len())?;
         e.put(self.as_bytes())
     }
+    fn is_default(&self) -> bool {
+        self.is_empty()
+    }
 }
 
 impl<'a, C> Decode<'a, C> for &'a str {
@@ -465,6 +515,9 @@ impl<C> Encode<C> for &[u8] {
     fn encode(&self, e: &mut Encoder<'_, C>) -> Result<(), EncodeError> {
         e.put_len(self.len())?;
         e.put(self)
+    }
+    fn is_default(&self) -> bool {
+        self.is_empty()
     }
 }
 
@@ -493,6 +546,10 @@ impl<C, T: Encode<C>> Encode<C> for Option<T> {
         if let Some(v) = self {
             v.move_caps(caps);
         }
+    }
+
+    fn is_default(&self) -> bool {
+        self.is_none()
     }
 }
 
@@ -558,7 +615,7 @@ impl<'a, C, T: Decode<'a, C>> Decode<'a, C> for One<T> {
     fn decode(d: &mut Decoder<'a, '_, C>) -> Result<Self, DecodeError> {
         let saved = d.begin_list()?;
         let v = d.field()?;
-        d.end_list(saved);
+        d.end_list(saved)?;
         Ok(One(v))
     }
 }

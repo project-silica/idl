@@ -431,6 +431,40 @@ fn caps_move_into_call() {
     assert_eq!(live.get(), 0);
 }
 
+/// A request that carries a field after those the provider's version
+/// knows is a newer client's, asking for something this provider cannot do:
+/// answered `unknown_field` (V9 of spec/IDL.md 3.1) and not handled. Before,
+/// the field was skipped and the request done as if it had not been there.
+#[test]
+fn a_field_unknown_to_the_provider_is_refused_not_ignored() {
+    // V9: `echo` reply with status 5 `unknown_field`, empty payload.
+    const V9: [u8; 16] = [
+        0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00,
+    ];
+    // V1 (`echo` with "hi") with one more field after `data`: a byte 7.
+    const V1_AND_MORE: [u8; 27] = [
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00,
+        0x00, 0x07, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x68, 0x69, 0x07,
+    ];
+    let mut server = EchoServer {
+        swap: false,
+        big: false,
+    };
+    let mut reply = [0xeeu8; silica_idl_rt::MAX_MESSAGE];
+    let mut rcl: CapList<Cap> = CapList::new();
+    let n = echo::dispatch(&mut server, &V1_AND_MORE, CapList::new(), &mut reply, &mut rcl);
+    assert_eq!(&reply[..n], &V9, "dispatch's reply bytes");
+    assert!(rcl.is_empty());
+    assert_eq!(TransportError::UnknownField.to_string(), "unknown_field");
+    // The caller sees it as such.
+    assert_eq!(
+        silica_idl_rt::decode_reply::<Cap, echo::EchoReply, core::convert::Infallible>(&V9, CapList::new(), 1)
+            .unwrap_err(),
+        CallError::Transport(TransportError::UnknownField)
+    );
+}
+
 #[test]
 fn oversized_reply_is_reply_too_large() {
     // Vector: `echo` reply with status 4 `reply_too_large`, empty payload,
@@ -445,7 +479,8 @@ fn oversized_reply_is_reply_too_large() {
         0x00, 0x06, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x68, 0x69,
     ];
     assert_eq!(Status::from_raw(4), Some(Status::ReplyTooLarge));
-    assert_eq!(Status::from_raw(5), None);
+    assert_eq!(Status::from_raw(5), Some(Status::UnknownField));
+    assert_eq!(Status::from_raw(6), None);
     assert_eq!(TransportError::ReplyTooLarge.to_string(), "reply_too_large");
 
     // The provider's reply does not fit: `dispatch` answers status 4.

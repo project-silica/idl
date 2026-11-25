@@ -24,8 +24,16 @@ const V1: [u8; 26] = [
     0x06, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x68, 0x69,
 ];
 
-/// V2, `echo` reply, status `ok`, `data` empty.
-const V2: [u8; 24] = [
+/// V2, `echo` reply, status `ok`, `data` empty: the field holds its
+/// default, so the list ends before it.
+const V2: [u8; 20] = [
+    0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+];
+
+/// V2 as an encoder that writes trailing defaults sends it (one older
+/// than the rule): it still decodes to the same value.
+const V2_WRITTEN_OUT: [u8; 24] = [
     0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,
     0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 ];
@@ -129,7 +137,8 @@ fn known_answer_vectors() {
     encodes_to("V2", &V2, &[], |b, c| {
         v2.clone().encode_message(b, c).unwrap()
     });
-    assert_eq!(EchoReply::decode_message(&V2, none.clone()), Ok(v2));
+    assert_eq!(EchoReply::decode_message(&V2, none.clone()), Ok(v2.clone()));
+    assert_eq!(EchoReply::decode_message(&V2_WRITTEN_OUT, none.clone()), Ok(v2));
 
     // V3.
     let v3 = EchoRecordsRequest {
