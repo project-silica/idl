@@ -40,6 +40,10 @@ protocol silica.device.Manager version 2 {
         /// A console port, a byte stream to whoever is at the other end;
         /// its driver speaks `silica.console.Port`.
         port = 6,
+        /// The machine's hardware watchdog; its driver speaks
+        /// `silica.watchdog.Device`. Listed and opened only by the service
+        /// manager.
+        watchdog = 7,
     }
 
     /// A device with a running driver.
