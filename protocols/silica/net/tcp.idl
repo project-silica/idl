@@ -42,7 +42,12 @@
 /// resets it if it had not ended in order. Nothing a caller does with its
 /// streams can reach another connection or the stack's state: the stack
 /// copies bytes out of and into them and checks every position it reads.
-protocol silica.net.Tcp version 1 {
+///
+/// What a caller may do is in its capability, given by the service manager
+/// from the service's declaration (`silica_protocols::scope`): the one port
+/// it may listen on (`listen=<port>`) and whether it may connect out
+/// (`connect`). A port is the owner's to give, never the first claimant's.
+protocol silica.net.Tcp version 2 {
     /// Why a call was refused.
     enum Error : u32 {
         /// The memory is not a usable frame, or is already added
@@ -64,6 +69,9 @@ protocol silica.net.Tcp version 1 {
         no_address = 6,
         /// A port or address that cannot be used (port 0, address 0).
         bad_argument = 7,
+        /// The caller's capability does not carry that port (`listen`) or
+        /// connecting out (`connect`).
+        not_granted = 8,
     }
 
     /// Why the stack ended a receive stream other than in order: the
@@ -98,7 +106,8 @@ protocol silica.net.Tcp version 1 {
     /// again), and everything the last one had is let go of first.
     add_memory @6 (memory: cap<Frame>) -> () error Error;
 
-    /// Listen for connections to `port` on every address of the machine.
+    /// Listen for connections to `port` on every address of the machine,
+    /// the port the caller's capability carries (`not_granted` otherwise).
     /// The stack completes the handshakes itself and keeps up to `backlog`
     /// (at least 1) connections waiting, signalling `ready` when one
     /// arrives; more arrive refused. Returns the listener's number.
@@ -110,8 +119,9 @@ protocol silica.net.Tcp version 1 {
     /// when none is waiting.
     accept @2 (listener: u32, offset: u64, bits: u8, wake: cap<Notification>) -> (connection: u32, peer: Endpoint, requests: cap<Notification>) error Error;
 
-    /// Connect to `peer`, the streams in the block of 2^`bits` bytes at
-    /// `offset`, `wake` signalled. Returns at once: the transmit stream
+    /// Connect to `peer` (a capability that carries `connect`), the streams
+    /// in the block of 2^`bits` bytes at `offset`, `wake` signalled.
+    /// Returns at once: the transmit stream
     /// may be written now and its bytes go once the connection is made; a
     /// connection that cannot be made ends the receive stream with its
     /// `Reason`.
