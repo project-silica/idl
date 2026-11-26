@@ -53,8 +53,10 @@ protocol silica.device.Manager version 2 {
     }
 
     /// The devices of class `class` that have a running driver (none for a
-    /// class the caller was not given).
-    list @1 (class: Class) -> (devices: array<Device>);
+    /// class the caller was not given), from the `from`th on, as many as
+    /// fit a message; `next` is where the next part starts, 0 when there are
+    /// no more (version 2).
+    list @1 (class: Class, from: u32) -> (devices: array<Device>, next: u32);
 
     /// An endpoint to the driver of the device `id`, speaking the protocol
     /// of the device's class. It stops working when the driver ends; a

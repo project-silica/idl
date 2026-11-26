@@ -66,8 +66,11 @@ protocol silica.system.Manager version 4 {
         updated: bool,
     }
 
-    /// Every declared service and what it is doing.
-    list @1 () -> (services: array<Service>);
+    /// The declared services and what each is doing, from the `from`th on,
+    /// as many as fit a message; `next` is where the next part starts, 0
+    /// when there are no more (version 4; before, every service in one
+    /// message, which failed for every caller past some 40 of them).
+    list @1 (from: u32) -> (services: array<Service>, next: u32);
 
     /// Stop the service `name` now (its program ends at once, as if it had
     /// failed, but it is not started again) or start it again.
