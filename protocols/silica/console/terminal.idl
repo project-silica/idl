@@ -12,8 +12,9 @@ protocol silica.console.Terminal version 2 {
     write @1 (text: string) -> ();
 
     /// Wait for the next complete line. An empty line with busy=false means
-    /// Enter was pressed. If another reader is waiting or the console
-    /// cannot park this call, busy=true and no input was consumed.
+    /// Enter was pressed. Readers wait in turn, one call a holder: a holder
+    /// whose read still waits, or a call the console has no place to keep,
+    /// gets busy=true and no input was consumed.
     read_line @2 () -> (line: string, busy: bool);
 
     /// The size of the screen, in characters.
