@@ -17,8 +17,9 @@
 /// later (one recorded and sent again) closes the connection without
 /// answering. A connection is an owner's session once its first sealed
 /// message opens; the machine closes one that has not proved so within
-/// 10 s, and a session no whole message arrives on for an hour (or what
-/// the machine's owner set). After them, each sealed message's
+/// 10 s, and a session no whole message arrives on for an hour (or for
+/// what that owner's line of the owners file says, `idle=<seconds>`).
+/// After them, each sealed message's
 /// plaintext is one call or one answer:
 ///
 /// - a call: a channel (1 byte), then an IDL request (`spec/IDL.md`,
