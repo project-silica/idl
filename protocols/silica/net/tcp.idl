@@ -113,12 +113,18 @@ protocol silica.net.Tcp version 2 {
     /// again), and everything the last one had is let go of first.
     add_memory @6 (memory: cap<Frame>) -> () error Error;
 
-    /// Listen for connections to `port` on every address of the machine,
-    /// the port the caller's capability carries (`not_granted` otherwise).
-    /// The stack completes the handshakes itself and keeps up to `backlog`
-    /// (at least 1) connections waiting, signalling `ready` when one
-    /// arrives; more arrive refused. Returns the listener's number.
+    /// Retired: a caller named the port, and a port is the owner's to
+    /// give, so naming one is never the authority. Answered `not_granted`;
+    /// use `listen_given`. (Declared while the shipped revision has it.)
     listen @1 (port: u16, backlog: u32, ready: cap<Notification>) -> (listener: u32) error Error;
+
+    /// Listen for connections on every address of the machine, on the port
+    /// the caller's capability carries (`listen=<port>` in its declaration;
+    /// `not_granted` when it carries none): the caller names no port. The
+    /// stack completes the handshakes itself and keeps up to `backlog` (at
+    /// least 1) connections waiting, signalling `ready` when one arrives;
+    /// more arrive refused. Returns the listener's number and its port.
+    listen_given @8 (backlog: u32, ready: cap<Notification>) -> (listener: u32, port: u16) error Error;
 
     /// Take the oldest connection waiting on `listener`, its streams in
     /// the block of 2^`bits` bytes at `offset` in the caller's memory, the
