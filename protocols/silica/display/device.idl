@@ -46,8 +46,7 @@ protocol silica.display.Device version 2 {
         /// No frame is attached.
         not_attached = 2,
         /// The rectangle is not on the screen, or its pixels are not all
-        /// in the frame, or `offset` is not a multiple of 4 (a pixel's
-        /// start).
+        /// in the frame (a pixel may start at any byte of it).
         outside = 3,
         /// Another client's frame is attached (version 2).
         in_use = 4,
