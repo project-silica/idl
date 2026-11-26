@@ -7,12 +7,18 @@
 /// Provided by the remote management service (`remote`) on TCP port 22 to
 /// an owner whose public key the machine was given. A session is a Noise
 /// IK handshake (`Noise_IK_25519_ChaChaPoly_BLAKE2s`, prologue
-/// `silica.remote 1`), then messages each sealed with the session's keys.
+/// `silica.remote 2`), then messages each sealed with the session's keys.
 /// Every message on the TCP connection is its length (2 bytes, big-endian)
-/// and that many bytes. The first is the owner's handshake message (no
-/// payload), the second the machine's answer (no payload); a machine that
-/// does not know the owner's key, or cannot open the message, closes the
-/// connection without answering. After them, each sealed message's
+/// and that many bytes. The first is the owner's handshake message, whose
+/// payload is when it was made (the owner's clock in nanoseconds since
+/// 1970, 8 bytes, big-endian), the second the machine's answer (no
+/// payload); a machine that does not know the owner's key, cannot open the
+/// message, or has taken a first message from that owner made as late or
+/// later (one recorded and sent again) closes the connection without
+/// answering. A connection is an owner's session once its first sealed
+/// message opens; the machine closes one that has not proved so within
+/// 10 s, and a session no whole message arrives on for an hour (or what
+/// the machine's owner set). After them, each sealed message's
 /// plaintext is one call or one answer:
 ///
 /// - a call: a channel (1 byte), then an IDL request (`spec/IDL.md`,
