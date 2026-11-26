@@ -54,7 +54,7 @@
 /// from the service's declaration (`silica_protocols::scope`): the one port
 /// it may listen on (`listen=<port>`) and whether it may connect out
 /// (`connect`). A port is the owner's to give, never the first claimant's.
-protocol silica.net.Tcp version 2 {
+protocol silica.net.Tcp version 3 {
     /// Why a call was refused.
     enum Error : u32 {
         /// The memory is not a usable frame, or is already added
@@ -118,13 +118,23 @@ protocol silica.net.Tcp version 2 {
     /// use `listen_given`. (Declared while the shipped revision has it.)
     listen @1 (port: u16, backlog: u32, ready: cap<Notification>) -> (listener: u32) error Error;
 
+    /// Retired: the caller named a backlog, a bound on what waits to be
+    /// accepted beside the one it already pays for (the memory it lent), so
+    /// a server could only set it too low (the remote service's eight, under
+    /// a burst of ten handshakes, lost an owner's). Answered `not_granted`;
+    /// use `listen_granted`. (Declared while the shipped revision has it.)
+    listen_given @8 (backlog: u32, ready: cap<Notification>) -> (listener: u32, port: u16) error Error;
+
     /// Listen for connections on every address of the machine, on the port
     /// the caller's capability carries (`listen=<port>` in its declaration;
     /// `not_granted` when it carries none): the caller names no port. The
-    /// stack completes the handshakes itself and keeps up to `backlog` (at
-    /// least 1) connections waiting, signalling `ready` when one arrives;
-    /// more arrive refused. Returns the listener's number and its port.
-    listen_given @8 (backlog: u32, ready: cap<Notification>) -> (listener: u32, port: u16) error Error;
+    /// stack completes the handshakes itself, and what waits to be accepted
+    /// is the caller's, as its connections are, paid for by the memory it
+    /// lent (`add_memory`): with that all in use, a new handshake takes the
+    /// place of the listener's oldest unfinished one, which is reset, or is
+    /// refused. `ready` is signalled when one arrives. Returns the
+    /// listener's number and its port.
+    listen_granted @9 (ready: cap<Notification>) -> (listener: u32, port: u16) error Error;
 
     /// Take the oldest connection waiting on `listener`, its streams in
     /// the block of 2^`bits` bytes at `offset` in the caller's memory, the
