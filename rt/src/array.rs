@@ -122,6 +122,10 @@ impl<'a, T: Encode<C> + Decode<'a, C>, C> Encode<C> for Array<'a, T, C> {
         }
         Ok(())
     }
+
+    fn is_default(&self) -> bool {
+        self.is_empty()
+    }
 }
 
 impl<'a, T: Decode<'a, C>, C> Decode<'a, C> for Array<'a, T, C> {

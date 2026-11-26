@@ -493,6 +493,11 @@ fn rejects_malformed() {
     reply[6] = 5;
     assert!(
         EchoRecordsReply::decode_message(&reply, none.clone()).is_err(),
+        "status 5 (unknown_field) with a payload"
+    );
+    reply[6] = 6;
+    assert!(
+        EchoRecordsReply::decode_message(&reply, none.clone()).is_err(),
         "unknown status"
     );
     let big = vec![0u8; silica_idl_rt::MAX_MESSAGE + 1];

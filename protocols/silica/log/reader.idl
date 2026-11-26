@@ -13,7 +13,7 @@
 /// the text from every ring, keeps the most recent 32 KiB of each service's,
 /// and puts every line on the machine's console as it was written. This is
 /// how the owner (the shell, a remote session) reads it.
-protocol silica.log.Reader version 1 {
+protocol silica.log.Reader version 2 {
     /// Why a call was refused.
     enum Error : u32 {
         /// No service of that name writes to the log.
@@ -28,8 +28,10 @@ protocol silica.log.Reader version 1 {
         written: u64,
     }
 
-    /// Every service the log takes text from.
-    sources @1 () -> (sources: array<Source>);
+    /// The sources the log takes text from, from the `from`th on, as many as
+    /// fit a message; `next` is where the next part starts, 0 when there are
+    /// no more (version 2; before, all in one message).
+    sources @1 (from: u32) -> (sources: array<Source>, next: u32);
 
     /// The text service `name` wrote from byte `from` on (counted from the
     /// start of the system; text older than the 32 KiB kept is gone, and the

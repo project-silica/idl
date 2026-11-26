@@ -803,28 +803,95 @@ fn version_skew() {
 
     // A new client and an old server.
     let mut new: v2::counter::Client<ToOld, Cap> = ToOld(OldServer::default()).into();
-    // Appended parameters the old server does not know are skipped; appended
-    // results it does not send take their defaults.
+    // Appended parameters left at their defaults are not sent: the old
+    // server gets exactly the request it knows. Appended results it does
+    // not send take their defaults.
     let r = new
         .add(
             v2::counter::Step {
                 by: 4,
-                label: "four",
-                mode: v2::counter::Mode::Hold,
+                label: "",
+                mode: v2::counter::Mode::Up,
             },
-            3,
-            Some(v2::counter::Window { lo: 1, hi: 2 }),
-            true,
+            0,
+            None,
+            false,
         )
         .unwrap();
     assert_eq!(r.total, 4);
     assert!(r.history.is_empty());
     assert_eq!(r.note, "");
+    // One that says something the old server cannot honour is refused,
+    // never ignored: before, the old server added 4 and the caller, who
+    // asked for a step held 3 times within a window, was told it was done.
+    // Nested (a struct's appended field) or at the top, each is refused.
+    for (step, repeat, window, strict) in [
+        (
+            v2::counter::Step {
+                by: 4,
+                label: "four",
+                mode: v2::counter::Mode::Up,
+            },
+            0,
+            None,
+            false,
+        ),
+        (
+            v2::counter::Step {
+                by: 4,
+                label: "",
+                mode: v2::counter::Mode::Hold,
+            },
+            0,
+            None,
+            false,
+        ),
+        (
+            v2::counter::Step {
+                by: 4,
+                label: "",
+                mode: v2::counter::Mode::Up,
+            },
+            3,
+            None,
+            false,
+        ),
+        (
+            v2::counter::Step {
+                by: 4,
+                label: "",
+                mode: v2::counter::Mode::Up,
+            },
+            0,
+            Some(v2::counter::Window { lo: 1, hi: 2 }),
+            false,
+        ),
+        (
+            v2::counter::Step {
+                by: 4,
+                label: "",
+                mode: v2::counter::Mode::Up,
+            },
+            0,
+            None,
+            true,
+        ),
+    ] {
+        assert_eq!(
+            new.add(step, repeat, window, strict).unwrap_err(),
+            CallError::Transport(TransportError::UnknownField)
+        );
+    }
     let r = new.status().unwrap();
     assert_eq!(r.mode, v2::counter::Mode::Down);
-    assert_eq!(r.total, 4);
+    assert_eq!(r.total, 4, "no refused step was applied");
     assert_eq!(r.window, v2::counter::Window { lo: 0, hi: 0 });
-    let r = new.swap(Cap(8), 512).unwrap();
+    // A capability in a refused request is released, not kept.
+    assert_eq!(
+        new.swap(Cap(9), 512).unwrap_err(),
+        CallError::Transport(TransportError::UnknownField)
+    );
+    let r = new.swap(Cap(8), 0).unwrap();
     assert_eq!((r.frame, r.length), (Cap(8), 0));
     // A method the old server does not have.
     assert_eq!(

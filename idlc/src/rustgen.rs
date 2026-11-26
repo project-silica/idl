@@ -463,14 +463,42 @@ impl Gen<'_> {
             "        fn encode(&self, e: &mut {RT}::Encoder<'_, C>) -> ::core::result::Result<(), {RT}::EncodeError> {{"
         );
         let _ = writeln!(o, "            let at = e.begin_list()?;");
+        // Fields at the end that hold their defaults are left out: a
+        // decoder gives them back from their absence, and an older
+        // provider sees exactly the request it knows (`spec/IDL.md` 3, 4).
+        let keep = if fields.is_empty() {
+            "let keep"
+        } else {
+            "let mut keep"
+        };
+        let _ = writeln!(o, "            {keep} = e.len();");
         for f in fields {
             let _ = writeln!(
                 o,
                 "            {RT}::Encode::<C>::encode(&self.{}, e)?;",
                 f.name.name
             );
+            let _ = writeln!(
+                o,
+                "            if !{RT}::Encode::<C>::is_default(&self.{}) {{ keep = e.len(); }}",
+                f.name.name
+            );
         }
+        let _ = writeln!(o, "            e.truncate(keep);");
         let _ = writeln!(o, "            e.end_list(at)");
+        let _ = writeln!(o, "        }}");
+        let _ = writeln!(o);
+        let _ = writeln!(o, "        fn is_default(&self) -> bool {{");
+        let all: Vec<String> = fields
+            .iter()
+            .map(|f| format!("{RT}::Encode::<C>::is_default(&self.{})", f.name.name))
+            .collect();
+        let all = if all.is_empty() {
+            "true".to_string()
+        } else {
+            all.join(" && ")
+        };
+        let _ = writeln!(o, "            {all}");
         let _ = writeln!(o, "        }}");
         let moving: Vec<&Field> = fields
             .iter()
@@ -523,7 +551,7 @@ impl Gen<'_> {
             }
         }
         let _ = writeln!(o, "            }};");
-        let _ = writeln!(o, "            d.end_list(saved);");
+        let _ = writeln!(o, "            d.end_list(saved)?;");
         let _ = writeln!(o, "            ::core::result::Result::Ok(v)");
         let _ = writeln!(o, "        }}");
         let _ = writeln!(o);
@@ -662,6 +690,12 @@ impl Gen<'_> {
         );
         let _ = writeln!(o, "            {RT}::Encode::<C>::encode(&self.raw(), e)");
         let _ = writeln!(o, "        }}");
+        if e.variants.iter().any(|v| v.value.value == 0) {
+            let _ = writeln!(o);
+            let _ = writeln!(o, "        fn is_default(&self) -> bool {{");
+            let _ = writeln!(o, "            self.raw() == 0");
+            let _ = writeln!(o, "        }}");
+        }
         let _ = writeln!(o, "    }}");
         let _ = writeln!(o);
         let _ = writeln!(
@@ -884,7 +918,7 @@ impl Gen<'_> {
             let _ = writeln!(o, "                }}");
             let _ = writeln!(
                 o,
-                "                ::core::result::Result::Err(_) => return {RT}::status_reply(reply, reply_caps, {ord}, VERSION, {RT}::Status::MalformedRequest),"
+                "                ::core::result::Result::Err(e) => return {RT}::status_reply(reply, reply_caps, {ord}, VERSION, {RT}::refusal(e)),"
             );
             let _ = writeln!(o, "            }},");
         }

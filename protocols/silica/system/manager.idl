@@ -7,7 +7,15 @@
 /// Provided by the service manager (the root task). Every running program
 /// of the system is one of its services or a child of one; a service is
 /// named as its declaration names it (the boot archive's services list).
-protocol silica.system.Manager version 3 {
+///
+/// What a caller may do is what its capability's scopes say
+/// (`silica_protocols::scope`, given by its declaration): `observe`
+/// (`list`, `describe`, `memory`), `control` (`start`, `stop`, `restart`),
+/// `update` (`program`, `update`, `revert`), `power` (`shutdown`) and `logs`
+/// (`add_log`). Anything else is `refused`; `list` and `memory` answer a
+/// caller without `observe` with nothing (version 4; before, every holder
+/// could do everything, the device manager included).
+protocol silica.system.Manager version 4 {
     /// Why a call was refused.
     enum Error : u32 {
         /// No service has that name.
@@ -25,9 +33,8 @@ protocol silica.system.Manager version 3 {
         /// version 3): not an ELF image for its processor, or one whose
         /// parts do not fit where it says they go.
         not_a_program = 5,
-        /// Past the largest program the service manager takes (16 MiB), past
-        /// what the caller staged, or more staged by all callers at once
-        /// than it keeps (32 MiB) (`stage`, `update`; version 3).
+        /// Past the largest program the service manager takes (16 MiB), or past
+        /// the memory the caller was lent (`program`, `update`).
         too_large = 6,
     }
 
@@ -58,8 +65,11 @@ protocol silica.system.Manager version 3 {
         updated: bool,
     }
 
-    /// Every declared service and what it is doing.
-    list @1 () -> (services: array<Service>);
+    /// The declared services and what each is doing, from the `from`th on,
+    /// as many as fit a message; `next` is where the next part starts, 0
+    /// when there are no more (version 4; before, every service in one
+    /// message, which failed for every caller past some 40 of them).
+    list @1 (from: u32) -> (services: array<Service>, next: u32);
 
     /// Stop the service `name` now (its program ends at once, as if it had
     /// failed, but it is not started again) or start it again.
@@ -105,20 +115,35 @@ protocol silica.system.Manager version 3 {
     /// shows its text as the source `<caller>/<name>`, where `<caller>` is
     /// the calling service's name, so no service can write as another. The
     /// caller keeps both for the next program in the same place (a driver
-    /// started again writes on where the last one stopped). At most 64
-    /// logs are given in all; past that, and with no log service, the
-    /// answer is `refused`.
+    /// started again writes on where the last one stopped). A service is
+    /// given as many logs as its declaration says (`logs`), in places that
+    /// are its own; past that, and with no log service, the answer is
+    /// `refused`, and the service manager's log says which.
     add_log @6 (name: string, ring: cap<Frame>) -> (wake: cap<Notification>) error Error;
 
-    /// Write `data` at byte `at` of the program the caller is sending (at
-    /// most 3,900 bytes a call): the service manager keeps one for each
-    /// caller, in its own memory, until `update` takes it or the caller
-    /// starts another at byte 0. A program comes in pieces rather than in a
-    /// frame the caller lends, so the service manager never reads memory
-    /// that its owner can take back while it reads.
+    /// Memory for a program the caller means to run a service on: a frame of
+    /// at least `bytes` bytes (the next power of two, a page at least), the
+    /// service manager's own, lent to the caller to write the program into
+    /// from its first byte (version 4). One for each caller: asking again
+    /// takes the last one back, `update` takes it, and it goes with the
+    /// caller when the caller ends. The memory is lent this way round
+    /// because the service manager reads no memory its owner can take away
+    /// while it reads: nothing answers a fault of the service manager's.
+    /// `too_large` past the largest program (16 MiB), `refused` when the
+    /// machine has no such memory left.
+    program @13 (bytes: u64) -> (memory: cap<Frame>) error Error;
+    /// Retired in version 4 and answered `refused`: a program came in
+    /// pieces the service manager kept in its own memory for each caller,
+    /// 32 MiB of them for all callers together, so one caller's pieces were
+    /// another's refusal. A caller writes its program into the memory
+    /// `program` lends; an owner on another machine sends it to the remote
+    /// service (`silica.remote.Session`'s `send`), which holds it in its own
+    /// memory until that owner's `update`. Declared while the revision
+    /// machines were installed from still has it.
     stage @10 (at: u64, data: bytes) -> () error Error;
-    /// Run the service `name` from now on on the first `length` bytes the
-    /// caller staged (an ELF image for this machine), in place of the
+    /// Run the service `name` from now on on the first `length` bytes of the
+    /// memory `program` lent the caller (an ELF image for this machine: the
+    /// service manager takes the memory back, then reads it), in place of the
     /// program it runs: what installs a new version of a service while the
     /// system runs. A running service is ended and started on the new
     /// program, as by `restart`; one that is not running starts on it when
@@ -128,12 +153,15 @@ protocol silica.system.Manager version 3 {
     /// An update is undone by itself when it does not work. A new program
     /// that cannot be started is answered `refused`, and the service runs
     /// its last program again. One that fails (faults, or ends with a
-    /// status other than 0) within 10 s of starting is replaced by the
-    /// program the service ran before, which is started again, `list` shows
-    /// it, and the log says why. The boot archive is not changed: the
+    /// status other than 0) before it has served (before it first waits
+    /// for requests, which its runtime tells the service manager) is
+    /// replaced by the program the service ran before, which is started
+    /// again, `list` shows it, and the log says why; however long it ran,
+    /// it never worked. A program that has served is the service's program,
+    /// and its later failures are a service's. The boot archive is not changed: the
     /// machine boots with the archive's program until the system has
-    /// storage to keep an update in (M5). Each `update` takes the staged
-    /// program, whatever its answer.
+    /// storage to keep an update in (M5). Each `update` takes the memory
+    /// lent, whatever its answer; `too_large` with none lent.
     update @11 (name: string, length: u64) -> () error Error;
     /// Run the service `name` on its program in the boot archive again,
     /// undoing every `update` of it, and restart it on that if it runs.

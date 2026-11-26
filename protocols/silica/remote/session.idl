@@ -7,12 +7,19 @@
 /// Provided by the remote management service (`remote`) on TCP port 22 to
 /// an owner whose public key the machine was given. A session is a Noise
 /// IK handshake (`Noise_IK_25519_ChaChaPoly_BLAKE2s`, prologue
-/// `silica.remote 1`), then messages each sealed with the session's keys.
+/// `silica.remote 2`), then messages each sealed with the session's keys.
 /// Every message on the TCP connection is its length (2 bytes, big-endian)
-/// and that many bytes. The first is the owner's handshake message (no
-/// payload), the second the machine's answer (no payload); a machine that
-/// does not know the owner's key, or cannot open the message, closes the
-/// connection without answering. After them, each sealed message's
+/// and that many bytes. The first is the owner's handshake message, whose
+/// payload is when it was made (the owner's clock in nanoseconds since
+/// 1970, 8 bytes, big-endian), the second the machine's answer (no
+/// payload); a machine that does not know the owner's key, cannot open the
+/// message, or has taken a first message from that owner made as late or
+/// later (one recorded and sent again) closes the connection without
+/// answering. A connection is an owner's session once its first sealed
+/// message opens; the machine closes one that has not proved so within
+/// 10 s, and a session no whole message arrives on for an hour (or for
+/// what that owner's line of the owners file says, `idle=<seconds>`).
+/// After them, each sealed message's
 /// plaintext is one call or one answer:
 ///
 /// - a call: a channel (1 byte), then an IDL request (`spec/IDL.md`,
@@ -26,13 +33,39 @@
 /// Channel 0 is this protocol; channel n is the n-th name `protocols`
 /// answers (from 1): `silica.system.Manager` and `silica.log.Reader`, so
 /// that what the shell does at the console a session does from afar
-/// (`silica-remote update` sends a program with the manager's `stage` and
-/// `update`, one piece a call). A call that needs a capability cannot be
-/// made from another machine (`add_log`): its provider sees the capability
-/// missing and refuses it.
+/// (`silica-remote update` sends a program with `send`, a piece a call,
+/// then calls the manager's `update`: the remote service writes what that
+/// owner sent into memory the service manager lends it, `program`, and
+/// passes the call on). A call that needs a capability cannot be
+/// made from another machine (`add_log`, `program`): the remote service
+/// refuses it.
 /// `silica_remote` (system/remote/proto) implements the framing, and the
 /// host's `silica-remote` is a client written on it.
-protocol silica.remote.Session version 1 {
+protocol silica.remote.Session version 2 {
+    /// Why a piece of a program was not taken (`send`, version 2).
+    enum Error : u32 {
+        /// The owner may not update this machine's services
+        /// (`remote.owners`).
+        not_allowed = 1,
+        /// Past the largest program a service runs on (16 MiB), or past
+        /// the end of what was sent so far (a piece starts where the last
+        /// one ended, or earlier).
+        too_large = 2,
+        /// The remote service has no memory left for it: what an owner
+        /// sends is held in the remote service's own memory (its
+        /// declaration's), never the service manager's.
+        no_room = 3,
+    }
+
     /// The protocols this session carries, `names[i]` on channel `i + 1`.
     protocols @1 () -> (names: array<string>);
+
+    /// Write `data` at byte `at` of the program the calling owner is
+    /// sending (at most 3,900 bytes a call; version 2): what a session has
+    /// in place of memory to lend. The remote service keeps one program
+    /// for each owner, in its own memory, until that owner's `update` on
+    /// the service manager's channel takes it (whatever its answer), the
+    /// owner starts another at byte 0, or the owner's last session ends.
+    /// The service manager holds none of it before the `update`.
+    send @2 (at: u64, data: bytes) -> () error Error;
 }

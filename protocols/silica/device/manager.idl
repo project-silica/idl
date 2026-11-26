@@ -6,11 +6,23 @@
 ///
 /// A device is named by its identity: PCI segment, bus, device and function
 /// as `segment << 16 | bus << 8 | device << 3 | function`.
-protocol silica.device.Manager version 1 {
+///
+/// What a caller may do is what its capability's scopes say
+/// (`silica_protocols::scope`, given by its declaration): `list`, `open`
+/// and `watch` the devices of a class it was given (`block`, `network`,
+/// `display`, `port`, `input`, `entropy`); `restart` and `describe` any
+/// device with `control` (version 2; before, any holder could open any
+/// device and restart any driver).
+protocol silica.device.Manager version 2 {
     /// Why a call was refused.
     enum Error : u32 {
         /// No device with that identity has a running driver.
         no_such_device = 1,
+        /// The caller's capability does not allow it (version 2).
+        refused = 2,
+        /// The device manager has no room for what the call needs (a
+        /// capability slot) (version 2; before, `no_such_device`).
+        no_room = 3,
     }
 
     /// What a device is for.
@@ -28,6 +40,10 @@ protocol silica.device.Manager version 1 {
         /// A console port, a byte stream to whoever is at the other end;
         /// its driver speaks `silica.console.Port`.
         port = 6,
+        /// The machine's hardware watchdog; its driver speaks
+        /// `silica.watchdog.Device`. Listed and opened only by the service
+        /// manager.
+        watchdog = 7,
     }
 
     /// A device with a running driver.
@@ -40,15 +56,19 @@ protocol silica.device.Manager version 1 {
         driver: string,
     }
 
-    /// The devices of class `class` that have a running driver.
-    list @1 (class: Class) -> (devices: array<Device>);
+    /// The devices of class `class` that have a running driver (none for a
+    /// class the caller was not given), from the `from`th on, as many as
+    /// fit a message; `next` is where the next part starts, 0 when there are
+    /// no more (version 2).
+    list @1 (class: Class, from: u32) -> (devices: array<Device>, next: u32);
 
     /// An endpoint to the driver of the device `id`, speaking the protocol
     /// of the device's class. It stops working when the driver ends; a
     /// driver that is started again is reached by a new `open`. `gone`, if
     /// given, is signalled when this driver ends (however it ends), so a
     /// client waiting for its device hears of it at once: the device
-    /// manager keeps the capability until then.
+    /// manager keeps the capability until then, one for each caller and
+    /// device (a later `open`'s replaces it).
     open @2 (id: u32, gone: option<cap<Notification>>) -> (driver: cap<Endpoint>) error Error;
 
     /// End the driver of the device `id` at once, as if it had failed, and
@@ -71,6 +91,8 @@ protocol silica.device.Manager version 1 {
     /// first and then calls `list`, and calls `list` again each time
     /// `changed` is signalled: a change between the two is never missed,
     /// and a client with nothing to wait for is not woken. The device
-    /// manager keeps the capability until signalling it fails.
+    /// manager keeps the capability until signalling it fails, one for each
+    /// caller and class (a later `watch` replaces it); a class the caller
+    /// was not given is not watched.
     watch @5 (class: Class, changed: cap<Notification>) -> ();
 }

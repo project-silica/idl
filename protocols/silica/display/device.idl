@@ -9,11 +9,13 @@
 /// scans out from memory directly needs no copy at all. The driver only
 /// reads the frame.
 ///
-/// One client draws at a time: `attach` replaces the frame of the last
-/// `attach`, whoever made it. A client that hears its driver ended (the
-/// device manager's death notice) opens the new one, attaches again and
-/// presents the whole screen.
-protocol silica.display.Device version 1 {
+/// One client draws at a time: an `attach` while the frame of the last one
+/// is still there (its client has not taken it back, or ended) is refused,
+/// so nobody else who holds the driver's endpoint can take the screen over
+/// (version 2; before, it replaced the frame unnoticed). A client that
+/// hears its driver ended (the device manager's death notice) opens the
+/// new one, attaches again and presents the whole screen.
+protocol silica.display.Device version 2 {
     /// How pixels are laid out.
     enum Format : u32 {
         /// Four bytes a pixel, in memory order red, green, blue, unused.
@@ -41,11 +43,13 @@ protocol silica.display.Device version 1 {
     enum Error : u32 {
         /// The frame is not one the driver can read.
         bad_memory = 1,
-        /// No frame is attached (or another client's replaced it).
+        /// No frame is attached.
         not_attached = 2,
         /// The rectangle is not on the screen, or its pixels are not all
-        /// in the frame.
+        /// in the frame (a pixel may start at any byte of it).
         outside = 3,
+        /// Another client's frame is attached (version 2).
+        in_use = 4,
     }
 
     /// The mode the display is in. It does not change while the driver runs.

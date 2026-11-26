@@ -1,0 +1,20 @@
+// A hardware watchdog (component E13): what its driver provides.
+
+/// A watchdog: a timer in the machine that resets it unless it is petted
+/// before the timer runs out. It runs from the moment its driver starts.
+///
+/// The service manager is its only client (the device manager gives a
+/// capability to it to nobody else): it pets the watchdog from its own
+/// loop, so the machine is reset when the service manager or the kernel
+/// stops making progress, and nothing else can keep a hung machine alive
+/// by petting for it. A machine without a watchdog has no driver for one,
+/// and the service manager says so at boot.
+protocol silica.watchdog.Device version 1 {
+    /// How long the watchdog waits for a pet before it resets the
+    /// machine, and whether it reset the machine last time (the reason
+    /// this boot happened).
+    info @1 () -> (timeout_ms: u32, reset_last_boot: bool);
+
+    /// Start the timer over.
+    pet @2 () -> ();
+}

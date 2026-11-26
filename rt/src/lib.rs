@@ -26,7 +26,7 @@ pub use client::{CallError, ClientCore, Transport, TransportError};
 pub use codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, One, missing};
 pub use message::{
     Header, Status, decode_reply, decode_request, encode_error_reply, encode_message, encode_reply,
-    encode_request, encode_status_reply, request_ordinal, status_reply,
+    encode_request, encode_status_reply, refusal, request_ordinal, status_reply,
 };
 
 use core::cell::Cell;

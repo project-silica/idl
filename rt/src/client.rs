@@ -31,6 +31,10 @@ pub enum TransportError {
     /// The provider's reply exceeded the limits of `spec/IDL.md` section 3;
     /// it sent status `reply_too_large` instead.
     ReplyTooLarge,
+    /// The request carries a field the provider's version does not know:
+    /// the provider is older than the caller and did nothing (status
+    /// `unknown_field`, `spec/IDL.md` section 4).
+    UnknownField,
 }
 
 impl fmt::Display for TransportError {
@@ -44,6 +48,7 @@ impl fmt::Display for TransportError {
             TransportError::UnknownMethod => "unknown_method",
             TransportError::MalformedRequest => "malformed_request",
             TransportError::ReplyTooLarge => "reply_too_large",
+            TransportError::UnknownField => "unknown_field",
         })
     }
 }

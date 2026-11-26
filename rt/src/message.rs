@@ -18,6 +18,9 @@ pub enum Status {
     MalformedRequest = 3,
     /// The provider's reply did not fit the limits; empty payload.
     ReplyTooLarge = 4,
+    /// The request carries a field the provider's version does not know
+    /// (`spec/IDL.md` section 4): it is not honoured; empty payload.
+    UnknownField = 5,
 }
 
 impl Status {
@@ -28,6 +31,7 @@ impl Status {
             2 => Some(Status::UnknownMethod),
             3 => Some(Status::MalformedRequest),
             4 => Some(Status::ReplyTooLarge),
+            5 => Some(Status::UnknownField),
             _ => None,
         }
     }
@@ -262,11 +266,25 @@ pub fn request_ordinal(msg: &[u8]) -> Result<u32, u32> {
 fn decode_payload<'a, C, M: Decode<'a, C>>(
     msg: &'a [u8],
     mut caps: CapList<C>,
+    request: bool,
 ) -> Result<M, DecodeError> {
     let mut d = Decoder::new(&msg[HEADER_LEN..], &mut caps);
+    if request {
+        d.refuse_unknown();
+    }
     let v = M::decode(&mut d)?;
     d.finish()?;
     Ok(v)
+}
+
+/// The status a provider answers a request with that did not decode:
+/// `unknown_field` for a newer client's field it does not know,
+/// `malformed_request` for anything else.
+pub fn refusal(e: DecodeError) -> Status {
+    match e {
+        DecodeError::UnknownField => Status::UnknownField,
+        _ => Status::MalformedRequest,
+    }
 }
 
 /// Decodes a request of method `ordinal`, moving its capabilities out of
@@ -280,7 +298,7 @@ pub fn decode_request<'a, C, Q: Decode<'a, C>>(
     if h.reply || h.ordinal != ordinal {
         return Err(DecodeError::Unexpected);
     }
-    decode_payload(msg, caps)
+    decode_payload(msg, caps, true)
 }
 
 /// Decodes a reply of method `ordinal` as the caller observes it
@@ -306,8 +324,8 @@ pub fn decode_reply<'a, C, R: Decode<'a, C>, E: Decode<'a, C>>(
         }
     };
     match h.status {
-        Status::Ok => decode_payload(msg, caps).map_err(malformed),
-        Status::Error => match decode_payload::<C, One<E>>(msg, caps) {
+        Status::Ok => decode_payload(msg, caps, false).map_err(malformed),
+        Status::Error => match decode_payload::<C, One<E>>(msg, caps, false) {
             Ok(One(e)) => Err(CallError::Error(e)),
             Err(e) => Err(malformed(e)),
         },
@@ -322,6 +340,10 @@ pub fn decode_reply<'a, C, R: Decode<'a, C>, E: Decode<'a, C>>(
         Status::ReplyTooLarge => {
             empty()?;
             Err(CallError::Transport(TransportError::ReplyTooLarge))
+        }
+        Status::UnknownField => {
+            empty()?;
+            Err(CallError::Transport(TransportError::UnknownField))
         }
     }
 }
