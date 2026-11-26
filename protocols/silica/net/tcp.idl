@@ -39,7 +39,14 @@
 /// stack closes the receive stream when the peer has nothing more to send
 /// (reason 0, after the last byte), or when the connection failed, with a
 /// `Reason`. The caller then lets go of the connection (`close`), which
-/// resets it if it had not ended in order. Nothing a caller does with its
+/// resets it if it had not ended in order. A connection the caller let go
+/// of stays its own until TCP is done with it (the rest sent and
+/// acknowledged, both sides finished): it counts among the caller's
+/// connections, ends when the caller does, and gives its place to the
+/// caller's next connection when the caller has no other (the oldest
+/// first, reset). A peer that neither finishes nor takes what is left
+/// for it is given up on: silent in FIN-WAIT-2 for a minute, or its
+/// window shut through fifteen probes. Nothing a caller does with its
 /// streams can reach another connection or the stack's state: the stack
 /// copies bytes out of and into them and checks every position it reads.
 ///
@@ -106,12 +113,18 @@ protocol silica.net.Tcp version 2 {
     /// again), and everything the last one had is let go of first.
     add_memory @6 (memory: cap<Frame>) -> () error Error;
 
-    /// Listen for connections to `port` on every address of the machine,
-    /// the port the caller's capability carries (`not_granted` otherwise).
-    /// The stack completes the handshakes itself and keeps up to `backlog`
-    /// (at least 1) connections waiting, signalling `ready` when one
-    /// arrives; more arrive refused. Returns the listener's number.
+    /// Retired: a caller named the port, and a port is the owner's to
+    /// give, so naming one is never the authority. Answered `not_granted`;
+    /// use `listen_given`. (Declared while the shipped revision has it.)
     listen @1 (port: u16, backlog: u32, ready: cap<Notification>) -> (listener: u32) error Error;
+
+    /// Listen for connections on every address of the machine, on the port
+    /// the caller's capability carries (`listen=<port>` in its declaration;
+    /// `not_granted` when it carries none): the caller names no port. The
+    /// stack completes the handshakes itself and keeps up to `backlog` (at
+    /// least 1) connections waiting, signalling `ready` when one arrives;
+    /// more arrive refused. Returns the listener's number and its port.
+    listen_given @8 (backlog: u32, ready: cap<Notification>) -> (listener: u32, port: u16) error Error;
 
     /// Take the oldest connection waiting on `listener`, its streams in
     /// the block of 2^`bits` bytes at `offset` in the caller's memory, the
@@ -138,6 +151,13 @@ protocol silica.net.Tcp version 2 {
     /// the block and the notification are no longer used: the caller may
     /// use the block for another connection.
     close @4 (connection: u32) -> () error Error;
+
+    /// Reset `connection` and let go of it now, whatever it still had to
+    /// send or was answered `would_block` for: what a caller does to a
+    /// connection it closed whose peer does not take the rest, when it
+    /// needs the block for another (`silica_net::tcp` does, oldest first).
+    /// The block and the notification are no longer used.
+    reset @7 (connection: u32) -> () error Error;
 
     /// Stop listening; connections still waiting are reset.
     unlisten @5 (listener: u32) -> () error Error;
