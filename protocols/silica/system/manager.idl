@@ -115,9 +115,10 @@ protocol silica.system.Manager version 4 {
     /// shows its text as the source `<caller>/<name>`, where `<caller>` is
     /// the calling service's name, so no service can write as another. The
     /// caller keeps both for the next program in the same place (a driver
-    /// started again writes on where the last one stopped). At most 64
-    /// logs are given in all; past that, and with no log service, the
-    /// answer is `refused`.
+    /// started again writes on where the last one stopped). A service is
+    /// given as many logs as its declaration says (`logs`), in places that
+    /// are its own; past that, and with no log service, the answer is
+    /// `refused`, and the service manager's log says which.
     add_log @6 (name: string, ring: cap<Frame>) -> (wake: cap<Notification>) error Error;
 
     /// Memory for a program the caller means to run a service on: a frame of
@@ -152,9 +153,12 @@ protocol silica.system.Manager version 4 {
     /// An update is undone by itself when it does not work. A new program
     /// that cannot be started is answered `refused`, and the service runs
     /// its last program again. One that fails (faults, or ends with a
-    /// status other than 0) within 10 s of starting is replaced by the
-    /// program the service ran before, which is started again, `list` shows
-    /// it, and the log says why. The boot archive is not changed: the
+    /// status other than 0) before it has served (before it first waits
+    /// for requests, which its runtime tells the service manager) is
+    /// replaced by the program the service ran before, which is started
+    /// again, `list` shows it, and the log says why; however long it ran,
+    /// it never worked. A program that has served is the service's program,
+    /// and its later failures are a service's. The boot archive is not changed: the
     /// machine boots with the archive's program until the system has
     /// storage to keep an update in (M5). Each `update` takes the memory
     /// lent, whatever its answer; `too_large` with none lent.
