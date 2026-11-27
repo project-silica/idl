@@ -89,6 +89,9 @@ protocol silica.system.Manager version 4 {
     /// turn the machine off (`reboot`: reset it). Answered once accepted,
     /// before anything is stopped: the caller is then stopped, or asked to
     /// end, like every other service (it waits in no call meanwhile). A
+    /// call made to the service manager while the machine goes down, a
+    /// second `shutdown` included, is not answered: it fails with
+    /// `peer_gone` when its caller is stopped or the machine turns off. A
     /// machine that cannot be turned off says so in the log.
     shutdown @4 (reboot: bool) -> () error Error;
     /// End the running service `name` at once, as if it had failed (its
