@@ -74,7 +74,16 @@ fn main() -> ExitCode {
             println!("silica-idlc: {} page(s) written", ps.len());
             ExitCode::SUCCESS
         }
-        Some("check-compat") if args.len() == 3 || (args.len() == 4 && args[1] == "--retire") => {
+        // Two files, optionally after `--retire`; any other option, or a
+        // file named like one, is a usage error (`--retire old.idl` alone
+        // compared a file named `--retire`).
+        Some("check-compat")
+            if {
+                let retire = args.get(1).is_some_and(|a| a == "--retire");
+                let files = &args[1 + usize::from(retire)..];
+                files.len() == 2 && !files.iter().any(|f| f.starts_with("--"))
+            } =>
+        {
             let (old, new) = (
                 Path::new(&args[args.len() - 2]),
                 Path::new(&args[args.len() - 1]),

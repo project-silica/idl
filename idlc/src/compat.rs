@@ -15,6 +15,14 @@
 //! - An enum keeps its width and every variant's name and value, in the same
 //!   relative order; new variants may be inserted anywhere.
 //! - Doc comments may change freely.
+//!
+//! A retirement, the last step of a staged removal before the first `stable`
+//! release (`silica-idlc check-compat --retire <old> <new>`, which runs
+//! [`check_retirement`]), allows two things more: a method replaced by
+//! `reserved` at its ordinal (a method removed without it is an error), and a
+//! struct or enum removed. A protocol is retired whole by reserving every
+//! method; its file stays, so its ordinals are never given to other methods
+//! (`os/tools/check-protocols.sh` refuses a published file that is gone).
 
 use std::path::Path;
 

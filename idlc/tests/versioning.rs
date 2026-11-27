@@ -614,6 +614,20 @@ fn a_method_is_retired_into_its_reserved_ordinal() {
     // With it, the method retired into its ordinal is accepted.
     let (code, err) = run(&retired, true);
     assert_eq!(code, Some(0), "retired: {err}");
+    // `--retire` with one file, or another option, is a usage error, not a
+    // comparison of a file named like the option.
+    for args in [
+        vec!["--retire", "a.idl"],
+        vec!["--strict", "a.idl", "b.idl"],
+        vec!["a.idl", "--retire"],
+    ] {
+        let out = Command::new(bin)
+            .arg("check-compat")
+            .args(&args)
+            .output()
+            .expect("run silica-idlc");
+        assert_eq!(out.status.code(), Some(2), "{args:?}: {out:?}");
+    }
     // Its ordinal must stay reserved, the version must rise, and nothing
     // else may be removed or changed on the way.
     for (what, new, want) in [
