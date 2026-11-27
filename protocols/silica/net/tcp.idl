@@ -52,8 +52,9 @@
 ///
 /// What a caller may do is in its capability, given by the service manager
 /// from the service's declaration (`silica_protocols::scope`): the one port
-/// it may listen on (`listen=<port>`) and whether it may connect out
-/// (`connect`). A port is the owner's to give, never the first claimant's.
+/// it may listen on (`listen=<port>`), or the one peer port it may connect
+/// to (`connect=<port>`), and whether it may connect to any (`connect`). A
+/// port is the owner's to give, never the first claimant's.
 protocol silica.net.Tcp version 3 {
     /// Why a call was refused.
     enum Error : u32 {
@@ -142,7 +143,8 @@ protocol silica.net.Tcp version 3 {
     /// when none is waiting.
     accept @2 (listener: u32, offset: u64, bits: u8, wake: cap<Notification>) -> (connection: u32, peer: Endpoint, requests: cap<Notification>) error Error;
 
-    /// Connect to `peer` (a capability that carries `connect`), the streams
+    /// Connect to `peer` (a capability that carries `connect`, or
+    /// `connect=<port>` naming `peer`'s port; else `not_granted`), the streams
     /// in the block of 2^`bits` bytes at `offset`, `wake` signalled.
     /// Returns at once: the transmit stream
     /// may be written now and its bytes go once the connection is made; a
