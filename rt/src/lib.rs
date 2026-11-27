@@ -51,7 +51,8 @@ pub trait Capability {
     /// (`"Frame"`, `"Endpoint"`, ...), or `None` when the kernel did not
     /// report one. Generated decoding rejects a `cap<T>` reporting another
     /// name than `T`, and an `endpoint<P>` reporting another name than
-    /// `"Endpoint"`; `None` is never rejected.
+    /// `"Endpoint"`; it rejects `None` in either (a capability not known to
+    /// be what the field declares), and accepts anything in a plain `cap`.
     fn object_type(&self) -> Option<&str> {
         None
     }

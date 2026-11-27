@@ -270,6 +270,35 @@ fn enum_values_and_errors() {
     );
 }
 
+/// No array element carries a capability, at any depth: a rule of the
+/// language, checked for every backend. Capabilities travel in the
+/// message's list in encoding order and every decoding reads array
+/// elements without them (`spec/IDL.md` section 3), so such a protocol
+/// could never send what it declares. Before, only the Rust generator
+/// refused it, and `silica-idlc check` accepted the file.
+#[test]
+fn an_array_element_carries_no_capability() {
+    rejects(
+        "protocol t.X version 1 { m @1 (a: array<cap>) -> (); }",
+        &[(1, 35, "array")],
+    );
+    rejects(
+        "protocol t.X version 1 { m @1 () -> (a: array<option<endpoint<t.X>>>); }",
+        &[(1, 41, "array")],
+    );
+    rejects(
+        "protocol t.X version 1 { struct S { c: cap<Frame> } struct T { s: array<S> } }",
+        &[(1, 67, "array")],
+    );
+    rejects(
+        "protocol t.X version 1 { struct S { c: option<cap> } m @1 (a: option<array<S>>) -> (); }",
+        &[(1, 70, "array")],
+    );
+    accepts(
+        "protocol t.X version 1 { struct S { n: u8 } m @1 (a: array<S>, c: option<cap>) -> (); }",
+    );
+}
+
 #[test]
 fn types_resolve_and_do_not_recurse() {
     rejects(

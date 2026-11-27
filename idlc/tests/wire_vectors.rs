@@ -14,9 +14,15 @@ use echo::{
 };
 
 #[derive(Clone, Debug, PartialEq)]
-struct Cap(u32);
+struct Cap(u32, &'static str);
 
-impl Capability for Cap {}
+/// It reports its object type: a `cap<T>` or `endpoint<P>` takes only a
+/// capability known to be its type.
+impl Capability for Cap {
+    fn object_type(&self) -> Option<&str> {
+        Some(self.1)
+    }
+}
 
 /// V1, `echo` request, `data` = "hi".
 const V1: [u8; 26] = [
@@ -122,7 +128,7 @@ fn cap_list(caps: &[Cap]) -> CapList<Cap> {
 fn known_answer_vectors() {
     let none: CapList<Cap> = CapList::new();
     let rec = [v3_record()];
-    let [c0, c1, c2] = [Cap(100), Cap(101), Cap(102)];
+    let [c0, c1, c2] = [Cap(100, "Frame"), Cap(101, "Endpoint"), Cap(102, "Thread")];
     assert_eq!(echo::VERSION, 1, "the vectors use sender version 1");
 
     // V1.

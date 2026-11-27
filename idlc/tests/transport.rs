@@ -209,6 +209,50 @@ fn reply_status(reply: &[u8]) -> Status {
     Header::decode(reply).expect("reply header").status
 }
 
+/// A capability whose object type the transport cannot tell is neither a
+/// `cap<T>` nor an `endpoint<P>`: the request is malformed and its
+/// capabilities are released, as for one of another type. Before, an
+/// untold type passed every check (the decoder failed open), so a
+/// capability the transport could not inspect reached a server as the
+/// frame or endpoint it had declared.
+#[test]
+fn a_typed_capability_of_untold_type_is_refused() {
+    let live = Rc::new(Cell::new(0));
+    let cap = |id, ty| Cap::new(&live, id, ty);
+    let cases: [(Ty, Option<Ty>); 3] = [
+        (None, Some(Some("Endpoint"))),
+        (Some("Frame"), Some(None)),
+        (None, None),
+    ];
+    for (f, p) in cases {
+        let what = format!("frame {f:?}, peer {p:?}");
+        let mut buf = [0u8; silica_idl_rt::MAX_MESSAGE];
+        let mut cl = CapList::new();
+        let req = EchoCapsRequest {
+            frame: cap(1, f),
+            peer: p.map(|t| cap(2, t)),
+            any: cap(3, None),
+        };
+        let n = req.encode_message(&mut buf, &mut cl).unwrap();
+        let mut server = EchoServer::default();
+        let mut reply = [0u8; silica_idl_rt::MAX_MESSAGE];
+        let mut rcl = CapList::new();
+        let m = echo::dispatch(&mut server, &buf[..n], cl, &mut reply, &mut rcl);
+        assert_eq!(
+            reply_status(&reply[..m]),
+            Status::MalformedRequest,
+            "{what}"
+        );
+        assert!(rcl.is_empty(), "{what}");
+        drop(rcl);
+        assert_eq!(
+            live.get(),
+            0,
+            "{what}: the request's capabilities are released"
+        );
+    }
+}
+
 #[test]
 fn cap_type_mismatch_is_malformed() {
     let live = Rc::new(Cell::new(0));
@@ -219,16 +263,17 @@ fn cap_type_mismatch_is_malformed() {
     // Requests decoded by a provider: (frame, peer, any) object types.
     let cases: [(Ty, Option<Ty>, Ty, bool); 9] = [
         (frame, Some(ep), Some("Thread"), true),
-        (None, Some(None), None, true),
+        (frame, Some(ep), None, true),
         (frame, None, Some("Endpoint"), true),
-        // `cap` is never checked.
-        (None, Some(ep), Some("Vcpu"), true),
+        // `cap` is never checked: any type, or none told. (A typed field
+        // with none told: `a_typed_capability_of_untold_type_is_refused`.)
+        (frame, Some(ep), Some("Vcpu"), true),
         // `cap<Frame>` holding another object type.
         (ep, Some(ep), frame, false),
         (Some("Untyped"), None, None, false),
         // `endpoint<P>` holding something that is not an endpoint.
         (frame, Some(frame), None, false),
-        (None, Some(Some("Notification")), None, false),
+        (frame, Some(Some("Notification")), None, false),
         // Any name but `Frame`, even a near miss, is another type.
         (Some("frame"), None, None, false),
     ];
@@ -306,14 +351,13 @@ fn cap_type_mismatch_is_malformed() {
     let r = client.echo_caps(cap(1, frame), Some(cap(2, ep)), cap(3, None));
     assert_eq!(r, Err(CallError::Transport(TransportError::MalformedReply)));
     drop(r);
-    // Without reported types the same reply decodes: only reported types are
-    // checked.
-    let r = client
-        .echo_caps(cap(4, None), Some(cap(5, None)), cap(6, None))
-        .expect("unreported types are not checked");
+    // Without reported types nothing is known to be a frame or an endpoint:
+    // the request is refused before the server sees it (before, untold
+    // types were not checked, and the swapped reply decoded).
+    let r = client.echo_caps(cap(4, None), Some(cap(5, None)), cap(6, None));
     assert_eq!(
-        (r.frame.id, r.peer.as_ref().map(|c| c.id), r.any.id),
-        (5, Some(4), 6)
+        r,
+        Err(CallError::Transport(TransportError::MalformedRequest))
     );
     drop(r);
     assert_eq!(live.get(), 0);
@@ -367,7 +411,7 @@ fn caps_move_into_call() {
     let mut buf = [0u8; silica_idl_rt::MAX_MESSAGE];
     let mut cl = CapList::new();
     let n = EchoCapsRequest {
-        frame: cap(5, None),
+        frame: cap(5, Some("Frame")),
         peer: None,
         any: cap(6, None),
     }
@@ -628,11 +672,12 @@ fn oversized_reply_is_reply_too_large() {
     assert_eq!(m, 0);
 }
 
+/// Compiling refuses them, before any backend sees the protocol (the rule
+/// is the language's: `parse.rs`, `an_array_element_carries_no_capability`).
 #[test]
-fn generator_rejects_capabilities_in_arrays() {
+fn capabilities_in_arrays_are_refused_for_every_backend() {
     let src = "protocol x.Y version 1 {\n  struct Held { c: option<cap> }\n  a @1 (s: array<Held>) -> ();\n  b @2 () -> (e: array<endpoint<x.Y>>);\n  c @3 (n: option<array<cap<Frame>>>) -> ();\n  d @4 (ok: array<array<u8>>) -> ();\n}\n";
-    let ps = idlc::compile(&[("x/y.idl".into(), src.into())]).unwrap();
-    let errs = idlc::rustgen::rust(&ps[0]).unwrap_err();
+    let errs = idlc::compile(&[("x/y.idl".into(), src.into())]).unwrap_err();
     let text: Vec<String> = errs.iter().map(ToString::to_string).collect();
     assert_eq!(errs.len(), 3, "{text:?}");
     for (t, line) in text.iter().zip(["x/y.idl:3:", "x/y.idl:4:", "x/y.idl:5:"]) {
