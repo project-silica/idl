@@ -22,9 +22,12 @@
 /// (`silica_block::service::SHARE` capability slots: a window one, a
 /// connection two, a registered frame two) and at most 16 connections;
 /// past them `no_room`, and no program's use takes another's place
-/// (version 2). Everything a client shares stays the client's: it takes the
-/// rings and the memory back by revoking them
-/// (or by ending), at which point the device can no longer reach them and
+/// (version 2). A capability a program opened for one of its clients
+/// (`silica.device.Manager`'s `open_for`) is charged to that client within
+/// the program's share, each client at most a quarter of it. Everything a
+/// client shares stays the client's: it takes the rings and the memory back
+/// by revoking them (or by ending), at which point the device can no longer
+/// reach them and
 /// the provider treats the connection as closed. A provider that ends is
 /// seen by its client as `peer_gone` on the next call here; requests it had
 /// not completed are to be sent again to the provider that replaces it
