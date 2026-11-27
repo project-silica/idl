@@ -10,8 +10,10 @@
 /// What a caller may do is what its capability's scopes say
 /// (`silica_protocols::scope`, given by its declaration): `list`, `open`
 /// and `watch` the devices of a class it was given (`block`, `network`,
-/// `display`, `port`, `input`, `entropy`); `restart` and `describe` any
-/// device with `control` (version 2; before, any holder could open any
+/// `display`, `port`, `input`, `entropy`); `list` and `watch` of every
+/// class but the watchdog, and no `open`, with `list` (2026-11-27: seeing
+/// devices took `open` with it); `restart` and `describe` any device with
+/// `control` (version 2; before, any holder could open any
 /// device and restart any driver).
 protocol silica.device.Manager version 2 {
     /// Why a call was refused.
@@ -68,7 +70,11 @@ protocol silica.device.Manager version 2 {
     /// given, is signalled when this driver ends (however it ends), so a
     /// client waiting for its device hears of it at once: the device
     /// manager keeps the capability until then, one for each caller and
-    /// device (a later `open`'s replaces it).
+    /// device (a later `open`'s replaces it). Each capability it returns
+    /// has a badge of its own, never given before, that names the consumer
+    /// it was given to (`silica_protocols::driver_badge`: the consumer in
+    /// bits 32 to 47): a driver charges what it keeps for each capability
+    /// to that consumer.
     open @2 (id: u32, gone: option<cap<Notification>>) -> (driver: cap<Endpoint>) error Error;
 
     /// End the driver of the device `id` at once, as if it had failed, and

@@ -15,7 +15,11 @@
 ///
 /// Each capability to the device is one client, connected once; several
 /// clients may be connected at a time (a disk's partitions, each through a
-/// capability `narrow` made). Everything a client shares stays the client's: it takes the rings and the memory back by revoking them
+/// capability `narrow` made). What the provider keeps for a client is
+/// charged to the program it was given to (a device manager's consumer:
+/// `silica_protocols::driver_badge`), each program bounded on its own: at
+/// most 16 connections, past them `no_room`, and no program's use takes
+/// another's place. Everything a client shares stays the client's: it takes the rings and the memory back by revoking them
 /// (or by ending), at which point the device can no longer reach them and
 /// the provider treats the connection as closed. A provider that ends is
 /// seen by its client as `peer_gone` on the next call here; requests it had
@@ -83,7 +87,14 @@ protocol silica.block.Device version 1 {
     /// from block `first` of what this one reaches, numbered from 0 there:
     /// a partition. Whoever holds a capability may narrow it and hand the
     /// result on; the provider enforces the range on every request made
-    /// through it, and `info` through it says `blocks` blocks.
+    /// through it, and `info` through it says `blocks` blocks. Each call
+    /// makes a capability of its own, a client apart from every other,
+    /// even of the same blocks: no holder reaches another's connection,
+    /// memory or traces. A program holds at most 128 capabilities narrowed
+    /// from the whole device, and at most 4 lie under one of those; past
+    /// either, `no_room` (what a program has let go of, everything derived
+    /// from it gone and its client disconnected, makes room). No one
+    /// holder's capability is ever taken back to make room for another's.
     narrow @5 (first: u64, blocks: u64) -> (device: cap<Endpoint>) error Error;
 
     /// Where a traced request went in the provider (a request whose tag
