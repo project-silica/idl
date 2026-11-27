@@ -15,6 +15,14 @@
 //! - An enum keeps its width and every variant's name and value, in the same
 //!   relative order; new variants may be inserted anywhere.
 //! - Doc comments may change freely.
+//!
+//! A retirement, the last step of a staged removal before the first `stable`
+//! release (`silica-idlc check-compat --retire <old> <new>`, which runs
+//! [`check_retirement`]), allows two things more: a method replaced by
+//! `reserved` at its ordinal (a method removed without it is an error), and a
+//! struct or enum removed. A protocol is retired whole by reserving every
+//! method; its file stays, so its ordinals are never given to other methods
+//! (`os/tools/check-protocols.sh` refuses a published file that is gone).
 
 use std::path::Path;
 
@@ -24,6 +32,9 @@ use super::{Diagnostic, sorted};
 struct Cx<'a> {
     old: &'a Protocol,
     new: &'a Protocol,
+    /// A retirement ([`check_retirement`]): a method may be replaced by
+    /// `reserved` at its ordinal, and a struct or enum removed.
+    retire: bool,
     out: Vec<Diagnostic>,
 }
 
@@ -51,9 +62,24 @@ impl Cx<'_> {
 /// Every way `new` is not an additive evolution of `old`. Both must already
 /// pass [`super::parse()`]. Empty means compatible. Sorted by file and position.
 pub fn check_compat(old: &Protocol, new: &Protocol) -> Vec<Diagnostic> {
+    compare(old, new, false)
+}
+
+/// [`check_compat`] for a retirement, the staged removal allowed before the
+/// first stable release (`spec/ARCHITECTURE.md` section 4, `spec/IDL.md`
+/// section 4): as well as additive changes, a method may be replaced by
+/// `reserved` at its ordinal (it must be: the ordinal is never used again),
+/// and a struct or enum no longer used may go. Everything else is checked
+/// as in [`check_compat`], so nothing else changes unchecked beside it.
+pub fn check_retirement(old: &Protocol, new: &Protocol) -> Vec<Diagnostic> {
+    compare(old, new, true)
+}
+
+fn compare(old: &Protocol, new: &Protocol, retire: bool) -> Vec<Diagnostic> {
     let mut cx = Cx {
         old,
         new,
+        retire,
         out: Vec::new(),
     };
     let (on, nn) = (old.name.to_string(), new.name.to_string());
@@ -128,7 +154,23 @@ fn items(cx: &mut Cx<'_>) {
             .enumerate()
             .find(|(_, n)| key(n) == key(oi))
         else {
-            cx.at_old(item_span(oi), format!("{} removed", label(oi)));
+            match oi {
+                // Retired: its ordinal stays reserved, for good.
+                Item::Method(m) if cx.retire => {
+                    let o = m.ordinal.value;
+                    if !new.reserved().any(|r| r.ordinal.value == o) {
+                        cx.at_old(
+                            item_span(oi),
+                            format!(
+                                "method `{}` retired without `reserved @{o};`: a retired method must reserve its ordinal",
+                                m.name.name
+                            ),
+                        );
+                    }
+                }
+                Item::Struct(_) | Item::Enum(_) if cx.retire => {}
+                _ => cx.at_old(item_span(oi), format!("{} removed", label(oi))),
+            }
             continue;
         };
         if std::mem::discriminant(oi) != std::mem::discriminant(ni) {

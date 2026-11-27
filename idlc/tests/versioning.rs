@@ -427,17 +427,6 @@ fn rejected() -> Vec<(&'static str, String, &'static str)> {
             "appended field `f` of type `option<cap>` can carry a capability",
         ),
         (
-            "appended array of endpoints",
-            edit(&[
-                V2,
-                (
-                    "color: Color) error",
-                    "color: Color, peers: array<endpoint<t.Proto>>) error",
-                ),
-            ]),
-            "appended field `peers` of type `array<endpoint<t.Proto>>` can carry a capability",
-        ),
-        (
             "appended struct holding a capability",
             edit(&[
                 V2,
@@ -590,6 +579,98 @@ fn additive_only() {
     assert_eq!(out.status.code(), Some(2), "{out:?}");
 }
 
+/// Before the first stable release a method is retired in stages
+/// (`spec/ARCHITECTURE.md` section 4): the removal itself is checked by
+/// `check-compat --retire`, which accepts a method replaced by `reserved`
+/// at its ordinal, and nothing else that is not additive. Before, there was
+/// no such mode: the removal could only bypass the check altogether, and
+/// anything else in the same commit went unchecked with it.
+#[test]
+fn a_method_is_retired_into_its_reserved_ordinal() {
+    let bin = env!("CARGO_BIN_EXE_silica-idlc");
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("retire");
+    std::fs::create_dir_all(&dir).unwrap();
+    let old = dir.join("old.idl");
+    std::fs::write(&old, BASE).unwrap();
+    let run = |new: &str, retire: bool| {
+        let path = dir.join("new.idl");
+        std::fs::write(&path, new).unwrap();
+        let mut cmd = Command::new(bin);
+        cmd.arg("check-compat");
+        if retire {
+            cmd.arg("--retire");
+        }
+        let out = cmd.arg(&old).arg(&path).output().expect("run silica-idlc");
+        (
+            out.status.code(),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+        )
+    };
+    let retired = edit(&[V2, ("put @2 (key: string) -> ();", "reserved @2;")]);
+    // Without the mode a retirement is a removal, as before.
+    let (code, err) = run(&retired, false);
+    assert_eq!(code, Some(1), "{err}");
+    assert!(err.contains("method `put` removed"), "{err}");
+    // With it, the method retired into its ordinal is accepted.
+    let (code, err) = run(&retired, true);
+    assert_eq!(code, Some(0), "retired: {err}");
+    // `--retire` with one file, or another option, is a usage error, not a
+    // comparison of a file named like the option.
+    for args in [
+        vec!["--retire", "a.idl"],
+        vec!["--strict", "a.idl", "b.idl"],
+        vec!["a.idl", "--retire"],
+    ] {
+        let out = Command::new(bin)
+            .arg("check-compat")
+            .args(&args)
+            .output()
+            .expect("run silica-idlc");
+        assert_eq!(out.status.code(), Some(2), "{args:?}: {out:?}");
+    }
+    // Its ordinal must stay reserved, the version must rise, and nothing
+    // else may be removed or changed on the way.
+    for (what, new, want) in [
+        (
+            "no reserved ordinal",
+            edit(&[V2, ("put @2 (key: string) -> ();", "")]),
+            "reserve its ordinal",
+        ),
+        (
+            "another ordinal reserved",
+            edit(&[V2, ("put @2 (key: string) -> ();", "reserved @8;")]),
+            "reserve its ordinal",
+        ),
+        (
+            "version kept",
+            edit(&[("put @2 (key: string) -> ();", "reserved @2;")]),
+            "version",
+        ),
+        (
+            "an ordinal changed beside it",
+            edit(&[
+                V2,
+                ("put @2 (key: string) -> ();", "reserved @2;"),
+                ("give @3", "give @5"),
+            ]),
+            "ordinal of method `give`",
+        ),
+        (
+            "a field removed beside it",
+            edit(&[
+                V2,
+                ("put @2 (key: string) -> ();", "reserved @2;"),
+                ("x: i32,\n", ""),
+            ]),
+            "field `x`",
+        ),
+    ] {
+        let (code, err) = run(&new, true);
+        assert_eq!(code, Some(1), "{what}: {err}");
+        assert!(err.contains(want), "{what}: `{err}` lacks `{want}`");
+    }
+}
+
 fn fixture(v: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
@@ -606,7 +687,12 @@ fn fixture(v: &str) -> PathBuf {
 #[derive(Clone, Debug, PartialEq)]
 struct Cap(u32);
 
-impl Capability for Cap {}
+/// Every capability of the counter protocol is a `cap<Frame>`.
+impl Capability for Cap {
+    fn object_type(&self) -> Option<&str> {
+        Some("Frame")
+    }
+}
 
 /// A version 1 provider that records what it was given.
 #[derive(Default)]

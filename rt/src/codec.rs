@@ -33,6 +33,10 @@ pub enum DecodeError {
     /// A capability whose reported object type is not the one the field
     /// declares (`cap<T>`), or not an `Endpoint` (`endpoint<P>`).
     CapType,
+    /// A capability in a `cap<T>` or `endpoint<P>` field whose object type
+    /// the transport could not tell: it is not known to be what the field
+    /// declares, so it is refused, as one of another type is.
+    CapTypeUntold,
     /// A transferred capability that no field referenced.
     UnusedCap,
     /// Field lists nested deeper than [`MAX_DEPTH`].
@@ -46,6 +50,11 @@ pub enum DecodeError {
     /// with status `unknown_field`; never an error of a reply, whose
     /// unknown fields are skipped.
     UnknownField,
+    /// A request carries an enum value this version does not know: as an
+    /// unknown field, something this provider cannot honour. Answered
+    /// with status `unknown_field`; in a reply it decodes to the enum's
+    /// `Unknown` variant instead.
+    UnknownValue,
     /// Bytes after the payload's field list.
     TrailingBytes,
 }
@@ -62,10 +71,14 @@ impl fmt::Display for DecodeError {
             DecodeError::BadUtf8 => "string is not UTF-8",
             DecodeError::BadCapIndex => "capability index out of order",
             DecodeError::CapType => "capability of the wrong object type",
+            DecodeError::CapTypeUntold => {
+                "capability whose object type the transport could not tell"
+            }
             DecodeError::UnusedCap => "capability not referenced",
             DecodeError::TooDeep => "field lists nested too deep",
             DecodeError::MissingField => "missing field without default",
             DecodeError::UnknownField => "field unknown to this version",
+            DecodeError::UnknownValue => "enum value unknown to this version",
             DecodeError::TrailingBytes => "bytes after the payload",
         };
         f.write_str(s)
@@ -339,7 +352,9 @@ impl<'a, 'c, C> Decoder<'a, 'c, C> {
     /// Reads a capability index, which must be the next index in encoding
     /// order, and moves that capability out of the list. With
     /// `object_type` = `Some(t)`, a capability reporting another object
-    /// type is [`DecodeError::CapType`] (and stays in the list).
+    /// type is [`DecodeError::CapType`], and one whose type the transport
+    /// could not tell is [`DecodeError::CapTypeUntold`] (either stays in the
+    /// list): a typed field takes only what is known to be its type.
     pub fn cap(&mut self, object_type: Option<&str>) -> Result<C, DecodeError>
     where
         C: Capability,
@@ -353,14 +368,31 @@ impl<'a, 'c, C> Decoder<'a, 'c, C> {
             .get(self.next_cap)
             .ok_or(DecodeError::BadCapIndex)?;
         let cap = slot.take().ok_or(DecodeError::BadCapIndex)?;
-        if let (Some(want), Some(got)) = (object_type, cap.object_type())
-            && want != got
-        {
-            slot.set(Some(cap));
-            return Err(DecodeError::CapType);
+        if let Some(want) = object_type {
+            let refused = match cap.object_type() {
+                Some(got) if got == want => None,
+                Some(_) => Some(DecodeError::CapType),
+                None => Some(DecodeError::CapTypeUntold),
+            };
+            if let Some(e) = refused {
+                slot.set(Some(cap));
+                return Err(e);
+            }
         }
         self.next_cap += 1;
         Ok(cap)
+    }
+
+    /// An enum value outside the variants this version knows was read: in
+    /// a request ([`Decoder::refuse_unknown`]) that is
+    /// [`DecodeError::UnknownValue`], a value this provider cannot honour;
+    /// elsewhere it is kept as the enum's `Unknown` variant.
+    pub fn unknown_value(&self) -> Result<(), DecodeError> {
+        if self.strict {
+            Err(DecodeError::UnknownValue)
+        } else {
+            Ok(())
+        }
     }
 
     /// Checks that the input is fully read and every capability referenced.

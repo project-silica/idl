@@ -344,7 +344,51 @@ pub fn check_protocol(p: &Protocol) -> Vec<Diagnostic> {
         }
     }
 
+    // No array element carries a capability, at any depth: capabilities
+    // travel in the message's list in encoding order, and every decoding
+    // reads an array's elements without them (section 3), so a protocol
+    // declaring one could never send it. A rule of the language, not of
+    // one backend (`spec/IDL_RATIONALE.md` section 6).
+    let fields = p
+        .structs()
+        .flat_map(|s| s.fields.iter())
+        .chain(p.methods().flat_map(|m| m.params.iter().chain(&m.results)));
+    for f in fields {
+        arrays_without_caps(&mut cx, p, &f.ty);
+    }
+
     cx.out
+}
+
+/// Reports every `array<T>` within `ty` whose `T` can carry a capability.
+fn arrays_without_caps(cx: &mut Ctx<'_>, p: &Protocol, ty: &Type) {
+    match &ty.kind {
+        TypeKind::Array(t) if carries_cap(p, t, &mut HashSet::new()) => cx.err(
+            ty.span,
+            "an array element cannot carry a capability (capabilities travel beside the bytes, \
+             one per field); use up to four `option<cap>` fields"
+                .into(),
+        ),
+        TypeKind::Array(t) | TypeKind::Option(t) => arrays_without_caps(cx, p, t),
+        _ => {}
+    }
+}
+
+/// Whether a value of type `ty` can reference a capability, at any depth.
+/// `seen` holds the structs already looked into: a struct that contains
+/// itself is reported on its own, and adds nothing here.
+fn carries_cap<'p>(p: &'p Protocol, ty: &'p Type, seen: &mut HashSet<&'p str>) -> bool {
+    match &ty.kind {
+        TypeKind::Cap(_) | TypeKind::Endpoint(_) => true,
+        TypeKind::Array(t) | TypeKind::Option(t) => carries_cap(p, t, seen),
+        TypeKind::Named(id) => match p.item(&id.name) {
+            Some(Item::Struct(s)) if seen.insert(&s.name.name) => {
+                s.fields.iter().any(|f| carries_cap(p, &f.ty, seen))
+            }
+            _ => false,
+        },
+        _ => false,
+    }
 }
 
 fn check_type(cx: &mut Ctx<'_>, p: &Protocol, ty: &Type) {

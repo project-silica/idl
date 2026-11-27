@@ -128,6 +128,16 @@ pub fn load(paths: &[PathBuf]) -> Result<Vec<Protocol>, Vec<Diagnostic>> {
 /// `spec/IDL.md` section 4). Rules that need other files (`endpoint<P>`
 /// resolution) are left to [`load`].
 pub fn check_compat_files(old: &Path, new: &Path) -> Result<(), Vec<Diagnostic>> {
+    compare_files(old, new, false)
+}
+
+/// [`check_compat_files`] for a retirement ([`compat::check_retirement`]):
+/// what `silica-idlc check-compat --retire` checks.
+pub fn check_retirement_files(old: &Path, new: &Path) -> Result<(), Vec<Diagnostic>> {
+    compare_files(old, new, true)
+}
+
+fn compare_files(old: &Path, new: &Path, retire: bool) -> Result<(), Vec<Diagnostic>> {
     let read = |path: &Path| {
         std::fs::read_to_string(path).map_err(|e| {
             vec![Diagnostic {
@@ -155,6 +165,10 @@ pub fn check_compat_files(old: &Path, new: &Path) -> Result<(), Vec<Diagnostic>>
             return Err(sorted(errs));
         }
     };
-    let errs = compat::check_compat(&op, &np);
+    let errs = if retire {
+        compat::check_retirement(&op, &np)
+    } else {
+        compat::check_compat(&op, &np)
+    };
     if errs.is_empty() { Ok(()) } else { Err(errs) }
 }

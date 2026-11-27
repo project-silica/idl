@@ -19,9 +19,15 @@ use echo::{
 
 /// Stand-in capability: the tests only need it to be cloned and compared.
 #[derive(Clone, Debug, PartialEq)]
-struct Cap(u32);
+struct Cap(u32, &'static str);
 
-impl Capability for Cap {}
+/// It reports its object type: a `cap<T>` or `endpoint<P>` takes only a
+/// capability known to be its type.
+impl Capability for Cap {
+    fn object_type(&self) -> Option<&str> {
+        Some(self.1)
+    }
+}
 
 /// The sample provider: echoes everything; refuses an empty record list.
 struct EchoServer;
@@ -45,6 +51,38 @@ impl echo::Server<Cap> for EchoServer {
     fn echo_caps(&mut self, frame: Cap, peer: Option<Cap>, any: Cap) -> EchoCapsReply<Cap> {
         EchoCapsReply { frame, peer, any }
     }
+}
+
+/// A request carrying an enum value the provider's version does not know is
+/// answered `unknown_field` with nothing done, as one carrying a field it
+/// does not know is (`spec/IDL.md` section 4): the provider cannot honour
+/// what it was asked. Before, the value reached the server as `Unknown`,
+/// for each server to remember to refuse. A reply carrying one still
+/// decodes to `Unknown`: a caller tolerates a newer provider's answer.
+#[test]
+fn a_request_with_an_unknown_enum_value_is_refused() {
+    let recs = records();
+    let mut client: echo::Client<Loopback, Cap> = Loopback(EchoServer).into();
+    assert_eq!(
+        client.echo_records(Array::new(&recs)).map(|_| ()),
+        Err(CallError::Transport(TransportError::UnknownField)),
+        "a record of kind 9"
+    );
+    let r = client
+        .echo_records(Array::new(&recs[..1]))
+        .expect("known kinds only");
+    assert_eq!(r.records.len(), 1);
+    let mut buf = [0u8; silica_idl_rt::MAX_MESSAGE];
+    let mut cl = CapList::new();
+    let rep = EchoRecordsReply {
+        records: Array::new(&recs[1..]),
+    };
+    let n = rep.clone().encode_message(&mut buf, &mut cl).unwrap();
+    let back = EchoRecordsReply::decode_message(&buf[..n], cl).expect("a reply keeps it");
+    assert_eq!(
+        back.records.iter().next().map(|r| r.kind),
+        Some(Kind::Unknown(9))
+    );
 }
 
 /// A transport that hands the request straight to `dispatch`.
@@ -111,13 +149,31 @@ fn records() -> [Record<'static, Cap>; 2] {
 }
 
 fn caps(n: u32) -> [Cap; 3] {
-    [Cap(n), Cap(n + 1), Cap(n + 2)]
+    [
+        Cap(n, "Frame"),
+        Cap(n + 1, "Endpoint"),
+        Cap(n + 2, "Thread"),
+    ]
+}
+
+/// [`records`] with the second one's kind known: what a request may carry
+/// (one with a kind the provider does not know is refused).
+fn known_records() -> [Record<'static, Cap>; 2] {
+    let [a, b] = records();
+    [
+        a,
+        Record {
+            kind: Kind::Plain,
+            ..b
+        },
+    ]
 }
 
 /// Every request and reply message of the protocol, encoded, with how many
 /// capabilities it carries.
 fn all_messages() -> Vec<(&'static str, Vec<u8>, CapList<Cap>)> {
     let recs = records();
+    let known = known_records();
     let [c0, c1, c2] = caps(10);
     let mut out = Vec::new();
     let mut push = |name: &'static str, f: &dyn Fn(&mut [u8], &mut CapList<Cap>) -> usize| {
@@ -134,7 +190,7 @@ fn all_messages() -> Vec<(&'static str, Vec<u8>, CapList<Cap>)> {
     });
     push("echo_records request", &|b, c| {
         EchoRecordsRequest {
-            records: Array::new(&recs),
+            records: Array::new(&known),
         }
         .encode_message(b, c)
         .unwrap()
@@ -227,17 +283,26 @@ fn echo_round_trip() {
         Ok(req.clone())
     );
 
+    // A request with a kind the provider does not know is refused.
     let req = EchoRecordsRequest {
         records: Array::new(&recs),
+    };
+    let n = req.clone().encode_message(&mut buf, &mut cl).unwrap();
+    assert_eq!(
+        EchoRecordsRequest::decode_message(&buf[..n], cl.clone()),
+        Err(DecodeError::UnknownValue)
+    );
+    let known = known_records();
+    let req = EchoRecordsRequest {
+        records: Array::new(&known),
     };
     let n = req.clone().encode_message(&mut buf, &mut cl).unwrap();
     let got = EchoRecordsRequest::decode_message(&buf[..n], cl.clone()).unwrap();
     assert_eq!(got, req);
     assert_eq!(got.records.len(), 2);
     let back: Vec<Record<'_, Cap>> = got.records.iter().collect();
-    assert_eq!(back, recs.to_vec());
+    assert_eq!(back, known.to_vec());
     assert_eq!(back[0].tags.iter().collect::<Vec<_>>(), TAGS_A.to_vec());
-    assert_eq!(back[1].kind, Kind::Unknown(9));
 
     let req = EchoCapsRequest {
         frame: c0.clone(),
@@ -278,9 +343,9 @@ fn echo_round_trip() {
         Ok(rep)
     );
     let rep = EchoCapsReply {
-        frame: c2.clone(),
-        peer: Some(c0.clone()),
-        any: c1.clone(),
+        frame: c0.clone(),
+        peer: Some(c1.clone()),
+        any: c2.clone(),
     };
     let n = rep.clone().encode_message(&mut buf, &mut cl).unwrap();
     assert_eq!(
@@ -335,8 +400,10 @@ fn echo_round_trip() {
     // End to end: generated client -> transport -> dispatch -> server.
     let mut client: echo::Client<Loopback, Cap> = echo::Client::from(Loopback(EchoServer));
     assert_eq!(client.echo(b"ping"), Ok(EchoReply { data: b"ping" }));
-    let got = client.echo_records(Array::new(&recs)).unwrap();
-    assert_eq!(got.records, Array::new(&recs));
+    // Known kinds only: a request with an unknown one is refused
+    // (`a_request_with_an_unknown_enum_value_is_refused`).
+    let got = client.echo_records(Array::new(&recs[..1])).unwrap();
+    assert_eq!(got.records, Array::new(&recs[..1]));
     assert_eq!(
         client.echo_records(Array::new(&[])),
         Err(CallError::Error(EchoError::Empty))
@@ -352,13 +419,13 @@ fn echo_round_trip() {
             any: c2.clone()
         }
     );
-    let got = client.echo_caps(c2.clone(), None, c0.clone()).unwrap();
+    let got = client.echo_caps(c0.clone(), None, c2.clone()).unwrap();
     assert_eq!(
         got,
         EchoCapsReply {
-            frame: c2,
+            frame: c0,
             peer: None,
-            any: c0
+            any: c2
         }
     );
 
@@ -545,7 +612,7 @@ fn rejects_malformed() {
     past[23] = 3;
     assert_eq!(decode_caps(&past, &cl), Err(DecodeError::BadCapIndex));
     let mut extra = cl.clone();
-    extra.push(Cap(99)).unwrap();
+    extra.push(Cap(99, "Thread")).unwrap();
     assert_eq!(decode_caps(&msg, &extra), Err(DecodeError::UnusedCap));
     let short = CapList::from_slice(&[c0.clone(), c1.clone()]).unwrap();
     assert_eq!(decode_caps(&msg, &short), Err(DecodeError::BadCapIndex));
@@ -560,7 +627,7 @@ fn rejects_malformed() {
         "indices skip 1"
     );
     assert!(
-        CapList::from_slice(&[c0, c1, c2, Cap(4), Cap(5)]).is_none(),
+        CapList::from_slice(&[c0, c1, c2, Cap(4, "Thread"), Cap(5, "Thread")]).is_none(),
         "at most 4"
     );
 

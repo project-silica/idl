@@ -8,8 +8,9 @@ use crate::codec::{Decode, DecodeError, Decoder, Encode, EncodeError, Encoder};
 /// An `array<T>` value. Build one with [`Array::new`]; a decoded one is a
 /// view that decodes its elements again when iterated (they were validated
 /// when the array was decoded). Two arrays are equal when their elements are.
-/// Elements carry no capabilities: generated Rust rejects an `array` whose
-/// element type can carry one (`spec/IDL_RATIONALE.md` section 6).
+/// Elements carry no capabilities: the language refuses an `array` whose
+/// element type can carry one, for every backend (`spec/IDL.md` section 2,
+/// `spec/IDL_RATIONALE.md` section 6).
 pub struct Array<'a, T, C> {
     repr: Repr<'a, T, C>,
 }
