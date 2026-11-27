@@ -104,6 +104,14 @@ impl<T, C> ClientCore<T, C> {
             _caps: PhantomData,
         }
     }
+
+    /// Zero the message buffer: what the last reply held (a secret a
+    /// provider answered with) is not kept until the next call overwrites
+    /// it. The buffer is dead between calls.
+    pub fn wipe(&mut self) {
+        self.message.fill(0);
+        core::hint::black_box(&self.message);
+    }
 }
 
 impl<T: Transport<C>, C: Capability> ClientCore<T, C> {
