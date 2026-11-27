@@ -10,10 +10,13 @@
 /// What a caller may do is what its capability's scopes say
 /// (`silica_protocols::scope`, given by its declaration): `list`, `open`
 /// and `watch` the devices of a class it was given (`block`, `network`,
-/// `display`, `port`, `input`, `entropy`); `restart` and `describe` any
-/// device with `control` (version 2; before, any holder could open any
-/// device and restart any driver).
-protocol silica.device.Manager version 2 {
+/// `display`, `port`, `input`, `entropy`); `list` and `watch` of every
+/// class but the watchdog, and no `open`, with `list` (version 3; before,
+/// seeing a class took `open` of it); `open_for`, with `delegate` and the
+/// class (version 3); `restart` and `describe` any device with `control`
+/// (version 2; before, any holder could open any device and restart any
+/// driver).
+protocol silica.device.Manager version 3 {
     /// Why a call was refused.
     enum Error : u32 {
         /// No device with that identity has a running driver.
@@ -67,8 +70,15 @@ protocol silica.device.Manager version 2 {
     /// driver that is started again is reached by a new `open`. `gone`, if
     /// given, is signalled when this driver ends (however it ends), so a
     /// client waiting for its device hears of it at once: the device
-    /// manager keeps the capability until then, one for each caller and
-    /// device (a later `open`'s replaces it).
+    /// manager keeps the capability until then, one for each notification
+    /// given (the same one given again replaces it), at most 16 for one
+    /// holder and 64 for one caller, `no_room` past them (those whose
+    /// notification is gone do not count) (version 3; before, one for each
+    /// caller and device). Each capability it returns has a badge of its
+    /// own, never given before by that driver while it runs, that names the
+    /// consumer it is charged to (the caller; `silica_protocols::driver_badge`
+    /// has the layout): a driver charges what it keeps for each capability
+    /// to that consumer (version 3).
     open @2 (id: u32, gone: option<cap<Notification>>) -> (driver: cap<Endpoint>) error Error;
 
     /// End the driver of the device `id` at once, as if it had failed, and
@@ -95,4 +105,14 @@ protocol silica.device.Manager version 2 {
     /// caller and class (a later `watch` replaces it); a class the caller
     /// was not given is not watched.
     watch @5 (class: Class, changed: cap<Notification>) -> ();
+
+    /// As `open`, charged at the driver to `client` (a number of the
+    /// caller's own, at most 65535; `refused` past it) within the caller's
+    /// share: for a service that opens devices for its own clients (the
+    /// block server, a partition for each), so it divides what it may keep
+    /// in a driver among them and no client of it fills what another needs,
+    /// while it can make no share of its own nor charge another program's.
+    /// Needs `delegate`, which the service manager gives only the provider
+    /// of `silica.block.Partitions`, and the device's class (version 3).
+    open_for @6 (id: u32, client: u32, gone: option<cap<Notification>>) -> (driver: cap<Endpoint>) error Error;
 }
