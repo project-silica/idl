@@ -17,15 +17,19 @@
 /// clients may be connected at a time (a disk's partitions, each through a
 /// capability `narrow` made). What the provider keeps for a client is
 /// charged to the program it was given to (a device manager's consumer:
-/// `silica_protocols::driver_badge`), each program bounded on its own: at
-/// most 16 connections, past them `no_room`, and no program's use takes
-/// another's place. Everything a client shares stays the client's: it takes the rings and the memory back by revoking them
+/// `silica_protocols::driver_badge`), each program bounded on its own by
+/// what the provider can keep: a share of what it holds for clients
+/// (`silica_block::service::SHARE` capability slots: a window one, a
+/// connection two, a registered frame two) and at most 16 connections;
+/// past them `no_room`, and no program's use takes another's place
+/// (version 2). Everything a client shares stays the client's: it takes the
+/// rings and the memory back by revoking them
 /// (or by ending), at which point the device can no longer reach them and
 /// the provider treats the connection as closed. A provider that ends is
 /// seen by its client as `peer_gone` on the next call here; requests it had
 /// not completed are to be sent again to the provider that replaces it
 /// (reads and writes of blocks may be repeated).
-protocol silica.block.Device version 1 {
+protocol silica.block.Device version 2 {
     /// Why a call was refused.
     enum Error : u32 {
         /// Another client is connected, or this one already is.
@@ -89,18 +93,23 @@ protocol silica.block.Device version 1 {
     /// result on; the provider enforces the range on every request made
     /// through it, and `info` through it says `blocks` blocks. Each call
     /// makes a capability of its own, a client apart from every other,
-    /// even of the same blocks: no holder reaches another's connection,
-    /// memory or traces. A program holds at most 128 capabilities narrowed
-    /// from the whole device, and at most 4 lie under one of those; past
-    /// either, `no_room` (what a program has let go of, everything derived
-    /// from it gone and its client disconnected, makes room). No one
-    /// holder's capability is ever taken back to make room for another's.
+    /// even of the same blocks: no holder reaches another's connection or
+    /// memory (version 2; before, whoever narrowed the same range was given
+    /// the same capability). Each is one slot of its program's share, and at
+    /// most 4 lie under one capability narrowed from the whole device; past
+    /// either, `no_room`. What a program has let go of (everything derived
+    /// from it gone, its client disconnected, and the same for everything
+    /// under it) makes room; no holder's capability is ever taken back to
+    /// make room for another's.
     narrow @5 (first: u64, blocks: u64) -> (device: cap<Endpoint>) error Error;
 
     /// Where a traced request went in the provider (a request whose tag
-    /// has bit 62 set is traced; the 16 most recent are kept): when it was
-    /// taken from the ring, when the device accepted it, and when it was
-    /// completed (monotonic nanoseconds, the clock every program reads; 0:
-    /// not yet). Only the client that made the request may ask.
+    /// has bit 62 set is traced; the 16 most recent of the device's, any
+    /// client's, are kept): when it was taken from the ring, when the
+    /// device accepted it, and when it was completed (monotonic
+    /// nanoseconds, the clock every program reads; 0: not yet). Only the
+    /// client that made the request may ask, and a request's times are its
+    /// own whatever tags other clients use; another client's traced
+    /// requests can push it out of the 16.
     trace @6 (tag: u64) -> (taken: u64, started: u64, done: u64) error Error;
 }

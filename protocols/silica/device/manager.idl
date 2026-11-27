@@ -11,11 +11,12 @@
 /// (`silica_protocols::scope`, given by its declaration): `list`, `open`
 /// and `watch` the devices of a class it was given (`block`, `network`,
 /// `display`, `port`, `input`, `entropy`); `list` and `watch` of every
-/// class but the watchdog, and no `open`, with `list` (2026-11-27: seeing
-/// devices took `open` with it); `restart` and `describe` any device with
-/// `control` (version 2; before, any holder could open any
-/// device and restart any driver).
-protocol silica.device.Manager version 2 {
+/// class but the watchdog, and no `open`, with `list` (version 3; before,
+/// seeing a class took `open` of it); `open_for`, with `delegate` and the
+/// class (version 3); `restart` and `describe` any device with `control`
+/// (version 2; before, any holder could open any device and restart any
+/// driver).
+protocol silica.device.Manager version 3 {
     /// Why a call was refused.
     enum Error : u32 {
         /// No device with that identity has a running driver.
@@ -71,10 +72,10 @@ protocol silica.device.Manager version 2 {
     /// client waiting for its device hears of it at once: the device
     /// manager keeps the capability until then, one for each caller and
     /// device (a later `open`'s replaces it). Each capability it returns
-    /// has a badge of its own, never given before, that names the consumer
-    /// it was given to (`silica_protocols::driver_badge`: the consumer in
-    /// bits 32 to 47): a driver charges what it keeps for each capability
-    /// to that consumer.
+    /// has a badge of its own, never given before by that driver while it
+    /// runs, that names the consumer it is charged to (the caller; see
+    /// `silica_protocols::driver_badge` for the layout): a driver charges
+    /// what it keeps for each capability to that consumer (version 3).
     open @2 (id: u32, gone: option<cap<Notification>>) -> (driver: cap<Endpoint>) error Error;
 
     /// End the driver of the device `id` at once, as if it had failed, and
@@ -101,4 +102,13 @@ protocol silica.device.Manager version 2 {
     /// caller and class (a later `watch` replaces it); a class the caller
     /// was not given is not watched.
     watch @5 (class: Class, changed: cap<Notification>) -> ();
+
+    /// As `open`, charged to consumer `consumer` (a number of the service
+    /// manager's, as in that consumer's own badge) instead of the caller:
+    /// for a service that opens devices for its own clients (the block
+    /// server, a partition for each), so what each client uses of the
+    /// driver is that client's own, bounded on its own, and no client of
+    /// the service fills what another needs. Needs `delegate` and the
+    /// device's class (version 3).
+    open_for @6 (id: u32, consumer: u32, gone: option<cap<Notification>>) -> (driver: cap<Endpoint>) error Error;
 }
