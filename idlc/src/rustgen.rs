@@ -101,11 +101,11 @@ struct Gen<'p> {
 }
 
 /// Generate the Rust module for `p`, which must have passed
-/// [`crate::compile`]. Fails on names the generated code reserves and on an
-/// `array` whose element type can carry a capability.
+/// [`crate::compile`] (which refuses an `array` whose element type can
+/// carry a capability, for every backend). Fails on names the generated
+/// code reserves.
 pub fn rust(p: &Protocol) -> Result<String, Vec<Diagnostic>> {
     let mut errs = check_names(p);
-    errs.extend(check_arrays(p));
     errs.sort_by_key(|d| (d.span.line, d.span.col));
     if !errs.is_empty() {
         return Err(errs);
@@ -192,45 +192,6 @@ fn carries_cap(p: &Protocol, ty: &Type) -> bool {
         },
         _ => false,
     }
-}
-
-/// Rejects every `array<T>` whose `T` can carry a capability: capabilities
-/// move, and an array is a borrowed slice when sent and a view of the bytes
-/// when received, so neither can own one
-/// (`spec/IDL_RATIONALE.md` section 6).
-fn check_arrays(p: &Protocol) -> Vec<Diagnostic> {
-    fn walk(p: &Protocol, ty: &Type, errs: &mut Vec<Diagnostic>) {
-        match &ty.kind {
-            TypeKind::Array(t) => {
-                if carries_cap(p, t) {
-                    errs.push(Diagnostic {
-                        file: p.file.clone(),
-                        span: ty.span,
-                        message: "an array element cannot carry a capability in generated Rust; \
-                                  use up to four `option<cap>` fields"
-                            .into(),
-                    });
-                } else {
-                    walk(p, t, errs);
-                }
-            }
-            TypeKind::Option(t) => walk(p, t, errs),
-            _ => {}
-        }
-    }
-    let mut errs = Vec::new();
-    for item in &p.items {
-        match item {
-            Item::Struct(s) => s.fields.iter().for_each(|f| walk(p, &f.ty, &mut errs)),
-            Item::Method(m) => m
-                .params
-                .iter()
-                .chain(&m.results)
-                .for_each(|f| walk(p, &f.ty, &mut errs)),
-            _ => {}
-        }
-    }
-    errs
 }
 
 /// The expected object type name of a capability type, as a Rust
@@ -643,7 +604,7 @@ impl Gen<'_> {
         }
         let _ = writeln!(
             o,
-            "        /// A value this version does not know (a newer peer); not malformed."
+            "        /// A value this version does not know, in a newer provider's reply (a request carrying one is answered `unknown_field`)."
         );
         let _ = writeln!(o, "        Unknown({w}),");
         let _ = writeln!(o, "    }}");
@@ -706,10 +667,16 @@ impl Gen<'_> {
             o,
             "        fn decode(d: &mut {RT}::Decoder<'a, '_, C>) -> ::core::result::Result<Self, {RT}::DecodeError> {{"
         );
+        // A value this version does not know: refused in a request, kept as
+        // `Unknown` elsewhere (`Decoder::unknown_value`).
         let _ = writeln!(
             o,
-            "            ::core::result::Result::Ok(Self::from_raw(<{w} as {RT}::Decode<'a, C>>::decode(d)?))"
+            "            let v = Self::from_raw(<{w} as {RT}::Decode<'a, C>>::decode(d)?);"
         );
+        let _ = writeln!(o, "            if let Self::Unknown(_) = v {{");
+        let _ = writeln!(o, "                d.unknown_value()?;");
+        let _ = writeln!(o, "            }}");
+        let _ = writeln!(o, "            ::core::result::Result::Ok(v)");
         let _ = writeln!(o, "        }}");
         if e.variants.iter().any(|v| v.value.value == 0) {
             let _ = writeln!(o);

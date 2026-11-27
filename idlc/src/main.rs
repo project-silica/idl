@@ -74,8 +74,26 @@ fn main() -> ExitCode {
             println!("silica-idlc: {} page(s) written", ps.len());
             ExitCode::SUCCESS
         }
-        Some("check-compat") if args.len() == 3 => {
-            match idlc::check_compat_files(Path::new(&args[1]), Path::new(&args[2])) {
+        // Two files, optionally after `--retire`; any other option, or a
+        // file named like one, is a usage error (`--retire old.idl` alone
+        // compared a file named `--retire`).
+        Some("check-compat")
+            if {
+                let retire = args.get(1).is_some_and(|a| a == "--retire");
+                let files = &args[1 + usize::from(retire)..];
+                files.len() == 2 && !files.iter().any(|f| f.starts_with("--"))
+            } =>
+        {
+            let (old, new) = (
+                Path::new(&args[args.len() - 2]),
+                Path::new(&args[args.len() - 1]),
+            );
+            let checked = if args.len() == 4 {
+                idlc::check_retirement_files(old, new)
+            } else {
+                idlc::check_compat_files(old, new)
+            };
+            match checked {
                 Ok(()) => {
                     println!("silica-idlc: compatible");
                     ExitCode::SUCCESS
@@ -85,7 +103,7 @@ fn main() -> ExitCode {
         }
         _ => {
             eprintln!(
-                "ERROR: usage: silica-idlc check <file.idl>... | silica-idlc rust <out-dir> <file.idl>... | silica-idlc docs <out-dir> <file.idl>... | silica-idlc check-compat <old.idl> <new.idl>"
+                "ERROR: usage: silica-idlc check <file.idl>... | silica-idlc rust <out-dir> <file.idl>... | silica-idlc docs <out-dir> <file.idl>... | silica-idlc check-compat [--retire] <old.idl> <new.idl>"
             );
             ExitCode::from(2)
         }

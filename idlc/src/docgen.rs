@@ -139,8 +139,8 @@ fn interface(o: &mut String, p: &Protocol) {
         o,
         "The items of `{}` a program names, exactly as generated (`bytes` is `&[u8]`, `string` is `&str`, \
          `array<T>` is `silica_idl_rt::Array`, built with `Array::new(&[..])` and read with `.len()` and \
-         `.iter()`; a capability is a `C`; an enum has one more variant, `Unknown(raw)`, for values of a \
-         newer peer; every struct and enum also implements `Clone`, `Debug` and `PartialEq`, and has no \
+         `.iter()`; a capability is a `C`; an enum has one more variant, `Unknown(raw)`, for a value a \
+         newer provider replies with (a request carrying one is answered `unknown_field`); every struct and enum also implements `Clone`, `Debug` and `PartialEq`, and has no \
          fields but the ones shown):\n\n```rust\n{}```\n",
         module_name(p),
         out
@@ -227,6 +227,7 @@ pub fn markdown(p: &Protocol) -> String {
          | `malformed_reply` | The reply could not be decoded. |\n\
          | `unknown_method` | The provider does not implement the method (it is older than the caller). |\n\
          | `malformed_request` | The provider could not decode the request. |\n\
+         | `unknown_field` | The request carries a field or an enum value the provider does not know (it is older than the caller); nothing was done. |\n\
          | `reply_too_large` | The provider's reply exceeded the message limits. |\n\n\
          None of them carries reply data. A method is safe to retry after any of them unless its description says otherwise.\n"
     );

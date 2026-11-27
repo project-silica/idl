@@ -278,11 +278,11 @@ fn decode_payload<'a, C, M: Decode<'a, C>>(
 }
 
 /// The status a provider answers a request with that did not decode:
-/// `unknown_field` for a newer client's field it does not know,
-/// `malformed_request` for anything else.
+/// `unknown_field` for a newer client's field or enum value it does not
+/// know, `malformed_request` for anything else.
 pub fn refusal(e: DecodeError) -> Status {
     match e {
-        DecodeError::UnknownField => Status::UnknownField,
+        DecodeError::UnknownField | DecodeError::UnknownValue => Status::UnknownField,
         _ => Status::MalformedRequest,
     }
 }

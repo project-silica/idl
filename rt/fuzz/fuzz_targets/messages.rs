@@ -8,7 +8,8 @@
 //! - a provider's `dispatch` answers anything with a well-formed reply and
 //!   never panics.
 //!
-//! The first input byte picks how many capabilities arrive with the message.
+//! The first input byte picks how many capabilities arrive with the message
+//! and what the transport reports of each one's object type.
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
@@ -21,10 +22,19 @@ use echo::{
     EchoRequest, Record,
 };
 
+/// A stand-in capability and the object type its transport reports.
 #[derive(Clone, Debug, PartialEq)]
-struct Cap(u32);
+struct Cap(u32, Option<&'static str>);
 
-impl Capability for Cap {}
+impl Capability for Cap {
+    fn object_type(&self) -> Option<&str> {
+        self.1
+    }
+}
+
+/// What a transport may report of a capability: the types the sample
+/// protocol's typed fields declare, another, or nothing.
+const TYPES: [Option<&str>; 4] = [Some("Frame"), Some("Endpoint"), Some("Thread"), None];
 
 /// The sample provider: echoes everything; refuses an empty record list.
 struct Server;
@@ -59,8 +69,10 @@ macro_rules! round_trip {
 fuzz_target!(|data: &[u8]| {
     let Some((&sel, msg)) = data.split_first() else { return };
     let mut caps = CapList::new();
+    // The first byte's remainder picks how many capabilities arrive, the
+    // rest what the transport reports of each.
     for i in 0..(sel as usize % (MAX_CAPS + 1)) {
-        let _ = caps.push(Cap(i as u32));
+        let _ = caps.push(Cap(i as u32, TYPES[(sel as usize / (MAX_CAPS + 1) + i) % TYPES.len()]));
     }
     round_trip!(EchoRequest, msg, caps);
     round_trip!(EchoReply, msg, caps);
